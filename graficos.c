@@ -37,19 +37,19 @@ void dibujarLinea(punto_t* p1, punto_t* p2) {
     float x2 = (p2->x +1) * ANCHO/2;
     float y1 = (ALTURA/2)* (1-p1->y);
     float y2 = (ALTURA/2) * (1-p2->y);
-    
+    SDL_Rect pixel;
 
 
-    int xVectorDirector = (int) x2 - x1;
-    int yVectorDirector = (int) y2 - y1;
+    int xVectorDirector = (int) (x2 - x1);
+    int yVectorDirector = (int) (y2 - y1);
     int CantPixelesADibujar;
     if (abs(xVectorDirector) > abs(yVectorDirector)){ CantPixelesADibujar = abs(xVectorDirector);}else{ CantPixelesADibujar = abs(yVectorDirector);}
-    if (CantPixelesADibujar == 0) {return;};
+    if (CantPixelesADibujar == 0) { pixel = (SDL_Rect) {(int)x1, (int)y1, PIXELSIZE, PIXELSIZE};SDL_FillRect(surface, &pixel, COLOR_WHITE);return;}
     //la componente mas larga queda en 1, asi se puede sumar de a 1  
     float xNormalizado = xVectorDirector / CantPixelesADibujar;
     float yNormalizado = yVectorDirector / CantPixelesADibujar;
     for (int i = 0; i <= CantPixelesADibujar; i++) {
-        SDL_Rect pixel = {(int)x1, (int)y1, PIXELSIZE, PIXELSIZE};
+        pixel = (SDL_Rect){(int)x1, (int)y1, PIXELSIZE, PIXELSIZE};
         SDL_FillRect(surface, &pixel, COLOR_WHITE);
         x1 += xNormalizado;
         y1 += yNormalizado;
@@ -79,8 +79,8 @@ int main(){
         //SDL_FillRect(surface, &fondo, COLOR_BLACK);    
         //SDL_FillRect(surface, &rect, COLOR_WHITE);
         //linea_t* linea = crearLinea(1,2,10,20);
-        punto_t p1 = (punto_t){-1,-1,0};
-        punto_t p2 = (punto_t){1,1,0};
+        punto_t p1 = (punto_t){0,0,0};
+        punto_t p2 = (punto_t){0,0,0};
         dibujarLinea(&p1,&p2);
         SDL_UpdateWindowSurface(window);
         SDL_Delay(10);
