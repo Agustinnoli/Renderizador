@@ -34,11 +34,17 @@ typedef struct linea {
 punto_t p1;
 punto_t p2;
 } linea_t;
-
+typedef struct poligono {
+punto_t p1;
+punto_t p2;
+punto_t p3;
+} poligono_t;
 
 punto_t* copia;
-linea_t* lineasADibujar;
-int tamaniolineasADibujar;
+//linea_t* lineasADibujar;
+poligono_t* poligonosADibujar;
+
+int tamanioPoligonosADibujar;
 
 
 void dibujarLinea(punto_t* p1, punto_t* p2) {
@@ -54,7 +60,7 @@ void dibujarLinea(punto_t* p1, punto_t* p2) {
 
     float xVectorDirector2 = - xVectorDirector;
     float yVectorDirector2 = - yVectorDirector;
-
+    // s epuede simplificar haciendo primero que 1p sea el punto mas a la dereha y hacer la logica, y por un cambio de variables hacer luego que la var de p1 sea el mmas arriba 
     if(x1 > ANCHO){float mult = (ANCHO - x1)/xVectorDirector2; x1 = mult*xVectorDirector2 + x1;y1= mult*yVectorDirector2 + y1; }
     else if(x2 > ANCHO){float mult = (ANCHO - x2)/xVectorDirector; x2 = mult*xVectorDirector + x2;y2= mult*yVectorDirector + y2; }
     if(x1 < 0){float mult = (- x1)/xVectorDirector2; x1 = mult*xVectorDirector2 + x1;y1= mult*yVectorDirector2 + y1; }
@@ -80,6 +86,8 @@ void dibujarLinea(punto_t* p1, punto_t* p2) {
         y1 += yNormalizado;
     } 
 }
+
+
 punto_t puntos[] ={
 
 {0.5,0.5,0.5},
@@ -128,57 +136,126 @@ void generarRotacionYPasarACopia(){
     }
 }
 void alejarTodos(){
-    for(int i =0 ; i < tamaniolineasADibujar; i ++ ){
-        lineasADibujar[i].p1.x = lineasADibujar[i].p1.x / lineasADibujar[i].p1.z;
-        lineasADibujar[i].p1.y = lineasADibujar[i].p1.y / lineasADibujar[i].p1.z;
-        lineasADibujar[i].p2.x = lineasADibujar[i].p2.x / lineasADibujar[i].p2.z;
-        lineasADibujar[i].p2.y = lineasADibujar[i].p2.y / lineasADibujar[i].p2.z;
-
+    for(int i =0 ; i < tamanioPoligonosADibujar; i ++ ){
+        poligonosADibujar[i].p1.x = poligonosADibujar[i].p1.x / poligonosADibujar[i].p1.z;
+        poligonosADibujar[i].p1.y = poligonosADibujar[i].p1.y / poligonosADibujar[i].p1.z;
+        poligonosADibujar[i].p2.x = poligonosADibujar[i].p2.x / poligonosADibujar[i].p2.z;
+        poligonosADibujar[i].p2.y = poligonosADibujar[i].p2.y / poligonosADibujar[i].p2.z;
+        poligonosADibujar[i].p3.x = poligonosADibujar[i].p3.x / poligonosADibujar[i].p3.z;
+        poligonosADibujar[i].p3.y = poligonosADibujar[i].p3.y / poligonosADibujar[i].p3.z;
            
                   
     }
 
 }
 void dibujarPoligono(){
-    for (int i = 0; i < tamaniolineasADibujar; i++){
-        punto_t *p1 = &lineasADibujar[i].p1;
-        punto_t *p2 = &lineasADibujar[i].p2;
+    for (int i = 0; i < tamanioPoligonosADibujar; i++){
+        punto_t *p1 = &poligonosADibujar[i].p1;
+        punto_t *p2 = &poligonosADibujar[i].p2;
+        punto_t *p3 = &poligonosADibujar[i].p3;
         dibujarLinea(p1, p2);
+        dibujarLinea(p1, p3);
+        dibujarLinea(p3, p2);
 
     }
 }
+
+punto_t jijona(punto_t* dentro, punto_t* afuera){
+        punto_t vectorDirecotr = {afuera->x-dentro->x,afuera->y-dentro->y,afuera->z-dentro->z};
+        float Intersecccion = (NEARPLANE- afuera->z )/vectorDirecotr.z;
+        //afuera->x = vectorDirecotr.x*Intersecccion +afuera->x;
+        //afuera->y =vectorDirecotr.y*Intersecccion +afuera->y;
+        //afuera->z = NEARPLANE;
+        return (punto_t) {vectorDirecotr.x*Intersecccion +afuera->x,vectorDirecotr.y*Intersecccion +afuera->y,NEARPLANE};
+        
+}
+bool checkeoFueraPantallaPoligono3D(punto_t* p1,punto_t* p2,punto_t* p3){
+    bool p1Arriba = p1->y > p1->z;
+    bool p1Abajo = p1->y < -p1->z;
+    bool p1Derecha = p1->x > p1->z;
+    bool p1Izquierda = p1->x < -p1->z;
+    bool p2Arriba = p2->y > p2->z;
+    bool p2Abajo = p2->y < -p2->z;
+    bool p2Derecha = p2->x > p2->z;
+    bool p2Izquierda = p2->x < -p2->z;
+    bool p3Arriba = p3->y > p3->z;
+    bool p3Abajo = p3->y < -p3->z;
+    bool p3Derecha = p3->x >  p3->z;
+    bool p3Izquierda = p3->x < -p3->z;
+    return(p1Arriba&&p2Arriba&&p3Arriba)||(p1Abajo&&p2Abajo&&p3Abajo)||(p1Derecha&&p2Derecha&&p3Derecha)||(p1Izquierda&&p2Izquierda&&p3Izquierda);    
+}
 void clip3D(){
-    tamaniolineasADibujar =0;
+    tamanioPoligonosADibujar =0;
+    int yay;
+    punto_t* temp;
+    punto_t temp2;
+    punto_t temp3;
     for (int i = 0; i < (sizeof(poligonos) / sizeof(int[3])); i++){
-        for (int j =0 ; j < 3; j ++){
-            punto_t *p1 = &copia[poligonos[i][j]];
-            punto_t *p2 = &copia[poligonos[i][(j +1)%3]];
-            if(p1->z < NEARPLANE && p2->z < NEARPLANE){continue;}
-            if(p1->z < NEARPLANE || p2->z < NEARPLANE){
-                if(p1->z < NEARPLANE){punto_t* temp = p2; p2 = p1; p1 = temp;}
-                punto_t vectorDirecotr = {p2->x-p1->x,p2->y-p1->y,p2->z-p1->z};
-                float Intersecccion = (NEARPLANE- p2->z )/vectorDirecotr.z;
-                punto_t puntoInterseccion ={vectorDirecotr.x*Intersecccion +p2->x,vectorDirecotr.y*Intersecccion +p2->y,vectorDirecotr.z*Intersecccion +p2->z};
-                p2 = &puntoInterseccion;
+
+            punto_t *p1 = &copia[poligonos[i][0]];
+            punto_t *p2 = &copia[poligonos[i][1]];
+            punto_t *p3 = &copia[poligonos[i][2]];
+            yay = 0;
+            if(p1->z < NEARPLANE){ yay |= 0b001;}
+            if(p2->z < NEARPLANE){ yay |= 0b010;}// esto podria ser un enum 
+            if(p3->z < NEARPLANE){ yay |= 0b100;}
+            switch (yay){
+                case 0b000://ninguno afuera
+                    if(checkeoFueraPantallaPoligono3D(p1,p2,p3)){continue;}
+                    poligonosADibujar[tamanioPoligonosADibujar] = (poligono_t) {*p1,*p2,*p3};
+                    tamanioPoligonosADibujar++;
+                continue;
+                break;
+                case 0b001://p1 afuera
+                    goto caso1Afuera;
+                break;
+                case 0b010://p2 afuera
+                    temp = p2; p2 = p1; p1 = temp;
+                    goto caso1Afuera;
+                break;
+                case 0b100://p3 afuera
+                    temp = p3; p3 = p1; p1 = temp;
+                    goto caso1Afuera;
+                break;
+                case 0b011://p1 p2 afuera
+                    goto caso2Afuera;
+                break;
+                case 0b101://p1 p3 afuera
+                    temp = p3; p3 = p2; p2 = temp;
+                    goto caso2Afuera;
+                break;
+                case 0b110://p2 p3 afuera
+                    temp = p3; p3 = p1; p1 = temp;
+                    goto caso2Afuera;
+                break;
+                case 0b111://p1 p2 p3 afuera
+                    continue;
+                break;
             }
-            bool p1Arriba = p1->y > p1->z;
-            bool p1Abajo = p1->y < -p1->z;
-            bool p1Derecha = p1->x > p1->z;
-            bool p1Izquierda = p1->x < -p1->z;
-            bool p2Arriba = p2->y > p2->z;
-            bool p2Abajo = p2->y < -p2->z;
-            bool p2Derecha = p2->x > p2->z;
-            bool p2Izquierda = p2->x < -p2->z;
-            if(p1Arriba&&p2Arriba){continue;}
-            if(p1Abajo&&p2Abajo){continue;}
-            if(p1Derecha&&p2Derecha){continue;}
-            if(p1Izquierda&&p2Izquierda){continue;}
-            lineasADibujar[tamaniolineasADibujar] = (linea_t) {*p1,*p2};
-            tamaniolineasADibujar++;
-        }
+            caso1Afuera: // asumo que p1 esta afuera
+                temp2 = jijona(p3,p1);
+                if(!checkeoFueraPantallaPoligono3D(&temp2,p2,p3)){
+                    poligonosADibujar[tamanioPoligonosADibujar] = (poligono_t) {temp2,*p2,*p3};
+                    tamanioPoligonosADibujar++;
+                }
+                temp3 = jijona(p2,p1);
+                if(checkeoFueraPantallaPoligono3D(&temp3,p2,&temp2)){continue;}
+                poligonosADibujar[tamanioPoligonosADibujar] = (poligono_t) {temp3,*p2,temp2};
+                tamanioPoligonosADibujar++;
+                continue; 
+
+            caso2Afuera: // asumo p1 p2 afuera;
+                temp2 = jijona(p3,p1);
+                temp3 = jijona(p3,p2);
+                if(checkeoFueraPantallaPoligono3D(&temp3,&temp2,p3)){continue;}
+                poligonosADibujar[tamanioPoligonosADibujar] = (poligono_t) {temp3,temp2,*p3};
+                tamanioPoligonosADibujar++;
+                continue;
+        
     }
     
 }
+
 int main(){
     SDL_Init(SDL_INIT_VIDEO);
     window = SDL_CreateWindow("Renderer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,ANCHO , ALTURA, 0);
@@ -187,7 +264,8 @@ int main(){
     bool running = true;
     SDL_Event event;
     const Uint8 *teclado = SDL_GetKeyboardState(NULL);
-    lineasADibujar = malloc((sizeof(linea_t)*sizeof(poligonos)*3)/sizeof(int[3]));
+    //lineasADibujar = malloc((sizeof(linea_t)*sizeof(poligonos)*3)/sizeof(int[3]));
+    poligonosADibujar = malloc((sizeof(poligono_t)*sizeof(poligonos)*2)/sizeof(int[3]));
     copia = malloc(sizeof(puntos));
     while(running){
         while(SDL_PollEvent(&event)){
@@ -200,14 +278,14 @@ int main(){
             }            
         }
 
-        if (teclado[SDL_SCANCODE_W]) dz -= DELTATIEMPO;
-        if (teclado[SDL_SCANCODE_S]) dz += DELTATIEMPO;
-        if (teclado[SDL_SCANCODE_A]) dx += DELTATIEMPO;
-        if (teclado[SDL_SCANCODE_D]) dx -= DELTATIEMPO;
-        if (teclado[SDL_SCANCODE_SPACE]) dy -= DELTATIEMPO;
-        if (teclado[SDL_SCANCODE_LSHIFT]) dy += DELTATIEMPO;
-        if (teclado[SDL_SCANCODE_LEFT]) angulo += PI*DELTATIEMPO;
-        if (teclado[SDL_SCANCODE_RIGHT]) angulo -= PI*DELTATIEMPO;
+        if (teclado[SDL_SCANCODE_W]){dz -= DELTATIEMPO;} 
+        if (teclado[SDL_SCANCODE_S]){dz += DELTATIEMPO;} 
+        if (teclado[SDL_SCANCODE_A]){dx += DELTATIEMPO;} 
+        if (teclado[SDL_SCANCODE_D]){dx -= DELTATIEMPO;} 
+        if (teclado[SDL_SCANCODE_SPACE]){dy -= DELTATIEMPO;}
+        if (teclado[SDL_SCANCODE_LSHIFT]){dy += DELTATIEMPO;}
+        if (teclado[SDL_SCANCODE_LEFT]){angulo += PI*DELTATIEMPO;}
+        if (teclado[SDL_SCANCODE_RIGHT]){angulo -= PI*DELTATIEMPO;}
 
         generarRotacionYPasarACopia();
         ajustar();
@@ -222,8 +300,8 @@ int main(){
         SDL_FillRect(surface, &fondo, COLOR_BLACK); 
     }
     free(copia);
-    free(lineasADibujar);
+    //free(lineasADibujar);
+    free(poligonosADibujar);
     return 0;
 }
-
 
