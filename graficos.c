@@ -4,7 +4,6 @@
 #include <SDL2/SDL.h>
 #include <stdbool.h>
 #include <math.h>
-#include "graficos.h"
 
 #define COLOR_WHITE 0xffffffff
 #define COLOR_BLACK 0x00000000
