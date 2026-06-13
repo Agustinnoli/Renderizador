@@ -1,6 +1,0 @@
-lo que se pueda hacer con un arbol que se haga con un arbol para log m
-que el cache y todo lo compartido todos los hijos utilizen la misma pagina dde memoria, ver raceconditions si 2 intentas escribir al mismo tiempo en la cache
-
-si es directorio y no tiene / , redirecionar con /
-si es directorio y tiene /, agregar index.html y fijarse en cache
-
