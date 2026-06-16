@@ -43,6 +43,12 @@ El proyecto implementa manualmente las etapas fundamentales de un pipeline de re
 El objetivo principal del proyecto fue comprender cómo funcionan internamente los motores gráficos y los pipelines de renderizado, implementando manualmente cada etapa fundamental utilizando únicamente C y SDL2.
 
 ## Capturas
+modelo del pinguino por: https://github.com/Max-Kawula
+![Render 1](assets/moving_penguin.gif)
+
+![Render 2](assets/spinning_cube.gif)
+
+![Render 3](assets/spinning_penguin.gif)
 
 ## Estado actual
 
