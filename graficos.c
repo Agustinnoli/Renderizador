@@ -216,173 +216,74 @@ bool checkeoFueraPantallaPoligono3D(punto3D_t* p1,punto3D_t* p2,punto3D_t* p3){
 }
 
 
+void caso2Afuera(punto3D_t *p1,punto3D_t *p2,punto3D_t *p3){//asumo p1 p2 afuera
+    *p1 = jijona(p3,p1);
+    *p2 = jijona(p3,p2);
+
+}
+void caso1Afuera(punto3D_t *p1,punto3D_t *p2,punto3D_t *p3, punto3D_t *temp){//asumo p1 p2 afuera
+    *temp = jijona(p3,p1);
+    *p1 = jijona(p2,p1);
+}
 
 void clip3D(){
-
     tamanioPoligonosClipeados =0;
-
     int yay;
-
-    punto3D_t* temp;
-
-    punto3D_t temp2;
-
-    punto3D_t temp3;
-
+    punto3D_t temp = {0};
     for (int i = 0; i < (sizeof(poligonos) / sizeof(int[3])); i++){
 
-
-
-            punto3D_t *p1 = &poligonosRotados[i].p1;
-
-            punto3D_t *p2 = &poligonosRotados[i].p2;
-
-            punto3D_t *p3 = &poligonosRotados[i].p3;
-
+            punto3D_t p1 = poligonosRotados[i].p1;
+            punto3D_t p2 = poligonosRotados[i].p2;
+            punto3D_t p3 = poligonosRotados[i].p3;
             yay = 0;
-
-            if(p1->z < NEARPLANE){ yay |= 0b001;}
-
-            if(p2->z < NEARPLANE){ yay |= 0b010;}// esto podria ser un enum
-
-            if(p3->z < NEARPLANE){ yay |= 0b100;}
-
+            if(p1.z < NEARPLANE){ yay |= 0b001;}
+            if(p2.z < NEARPLANE){ yay |= 0b010;}// esto podria ser un enum 
+            if(p3.z < NEARPLANE){ yay |= 0b100;}
             switch (yay){
-
                 case 0b000://ninguno afuera
-
-                    if(checkeoFueraPantallaPoligono3D(p1,p2,p3)){continue;}
-
-                    poligonosClipeados[tamanioPoligonosClipeados] = (poligono3D_t) {*p1,*p2,*p3};
-
-                    tamanioPoligonosClipeados++;
-
+                    if(checkeoFueraPantallaPoligono3D(&p1,&p2,&p3)){continue;}
+                    poligonosClipeados[tamanioPoligonosClipeados++] = (poligono3D_t) {p1,p2,p3};
                 continue;
-
                 break;
-
                 case 0b001://p1 afuera
-
-                    temp2 = jijona(p3,p1);
-
-                    if(!checkeoFueraPantallaPoligono3D(&temp2,p2,p3)){
-
-                        poligonosClipeados[tamanioPoligonosClipeados] = (poligono3D_t) {temp2,*p2,*p3};
-
-                        tamanioPoligonosClipeados++;
-
-                    }
-
-                    temp3 = jijona(p2,p1);
-
-                    if(checkeoFueraPantallaPoligono3D(&temp3,p2,&temp2)){continue;}
-
-                    poligonosClipeados[tamanioPoligonosClipeados] = (poligono3D_t) {temp3,*p2,temp2};
-
-                    tamanioPoligonosClipeados++;
-
+                    caso1Afuera(&p1,&p2,&p3,&temp);
+                    if(!checkeoFueraPantallaPoligono3D(&temp,&p2,&p3)){poligonosClipeados[tamanioPoligonosClipeados++] = (poligono3D_t) {temp,p2,p3};}                    
+                    if(checkeoFueraPantallaPoligono3D(&p1,&p2,&temp)){continue;;}
+                    poligonosClipeados[tamanioPoligonosClipeados++] = (poligono3D_t) {p1,p2,temp};
                 break;
-
                 case 0b010://p2 afuera
-
-
-
-                    temp2 = jijona(p3,p2);
-
-                    if(!checkeoFueraPantallaPoligono3D(&temp2,p1,p3)){
-
-                        poligonosClipeados[tamanioPoligonosClipeados] = (poligono3D_t) {*p1,temp2,*p3};
-
-                        tamanioPoligonosClipeados++;
-
-                    }
-
-                    temp3 = jijona(p1,p2);
-
-                    if(checkeoFueraPantallaPoligono3D(&temp3,p2,&temp2)){continue;}
-
-                    poligonosClipeados[tamanioPoligonosClipeados] = (poligono3D_t) {*p1,temp3,temp2};
-
-                    tamanioPoligonosClipeados++;
-
+                    caso1Afuera(&p2,&p1,&p3,&temp);
+                    if(!checkeoFueraPantallaPoligono3D(&temp,&p2,&p3)){poligonosClipeados[tamanioPoligonosClipeados++] = (poligono3D_t) {p2,temp,p3};}
+                    if(checkeoFueraPantallaPoligono3D(&temp,&p2,&p1)){continue;;}
+                    poligonosClipeados[tamanioPoligonosClipeados++] = (poligono3D_t) {p1,p2,p3};
                 break;
-
                 case 0b100://p3 afuera
-
-
-
-                    temp2 = jijona(p1,p3);
-
-                    if(!checkeoFueraPantallaPoligono3D(&temp2,p2,p1)){
-
-                        poligonosClipeados[tamanioPoligonosClipeados] = (poligono3D_t) {*p2,temp2,*p1};
-
-                        tamanioPoligonosClipeados++;
-
-                    }
-
-                    temp3 = jijona(p2,p3);
-
-                    if(checkeoFueraPantallaPoligono3D(&temp3,p2,&temp2)){continue;}
-
-                    poligonosClipeados[tamanioPoligonosClipeados] = (poligono3D_t) {*p2,temp3,temp2};
-
-                    tamanioPoligonosClipeados++;
-
+                    caso1Afuera(&p3,&p2,&p1,&temp);
+                    if(!checkeoFueraPantallaPoligono3D(&temp,&p2,&p3)){poligonosClipeados[tamanioPoligonosClipeados++] = (poligono3D_t) {temp,p2,p3};}
+                    if(checkeoFueraPantallaPoligono3D(&temp,&p2,&p1)){continue;;}
+                    poligonosClipeados[tamanioPoligonosClipeados++] = (poligono3D_t) {p1,p2,temp};
                 break;
-
                 case 0b011://p1 p2 afuera
-
-                    temp2 = jijona(p3,p1);
-
-                    temp3 = jijona(p3,p2);
-
-                    if(checkeoFueraPantallaPoligono3D(&temp3,&temp2,p3)){continue;}
-
-                    poligonosClipeados[tamanioPoligonosClipeados] = (poligono3D_t) {temp3,*p3,temp2};
-
-                    tamanioPoligonosClipeados++;
-
+                    caso2Afuera(&p1,&p2,&p3);
+                    if(checkeoFueraPantallaPoligono3D(&p1,&p2,&p3)){continue;}
+                    poligonosClipeados[tamanioPoligonosClipeados++] = (poligono3D_t) {p1,p2,p3};
                 break;
-
                 case 0b101://p1 p3 afuera
-
-                    temp2 = jijona(p2,p1);
-
-                    temp3 = jijona(p2,p3);
-
-                    if(checkeoFueraPantallaPoligono3D(&temp2,p2,&temp3)){continue;}
-
-                    poligonosClipeados[tamanioPoligonosClipeados] = (poligono3D_t) {temp2,*p2,temp3};
-
-                    tamanioPoligonosClipeados++;
-
+                    caso2Afuera(&p1,&p3,&p2);
+                    if(checkeoFueraPantallaPoligono3D(&p2,&p1,&p3)){continue;}
+                    poligonosClipeados[tamanioPoligonosClipeados++] = (poligono3D_t) {p1,p2,p3};
                 break;
-
                 case 0b110://p2 p3 afuera
-
-                    temp2 = jijona(p1,p2);
-
-                    temp3 = jijona(p1,p3);
-
-                    if(checkeoFueraPantallaPoligono3D(p1,&temp2,&temp3)){continue;}
-
-                    poligonosClipeados[tamanioPoligonosClipeados] = (poligono3D_t) {*p1,temp2,temp3};
-
-                    tamanioPoligonosClipeados++;
-
+                    caso2Afuera(&p3,&p2,&p1);
+                    if(checkeoFueraPantallaPoligono3D(&p2,&p1,&p3)){continue;}
+                    poligonosClipeados[tamanioPoligonosClipeados++] = (poligono3D_t) {p1,p2,p3};
                 break;
-
                 case 0b111://p1 p2 p3 afuera
-
                     continue;
-
                 break;
-            }            
+            }
     }
-} 
-
-
+}
 
 
 
