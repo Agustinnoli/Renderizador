@@ -40,79 +40,38 @@ punto_t p3;
 } poligono_t;
 
 punto_t* copia;
-//linea_t* lineasADibujar;
 poligono_t* poligonosADibujar;
 
 int tamanioPoligonosADibujar;
 
-
-void dibujarLinea(punto_t* p1, punto_t* p2) {
-
-    float x1 = ((p1->x + 1) * ANCHO - PIXELSIZE)/2;
-    float x2 = ((p2->x + 1) * ANCHO - PIXELSIZE)/2;
-    float y1 = ((1 - p1->y) * ALTURA - PIXELSIZE)/2;
-    float y2 = ((1 - p2->y) * ALTURA - PIXELSIZE)/2;
-    SDL_Rect pixel;
-    int xVectorDirector = (int) (x2 - x1);
-    int yVectorDirector = (int) (y2 - y1);
-    int CantPixelesADibujar;
-
-    float xVectorDirector2 = - xVectorDirector;
-    float yVectorDirector2 = - yVectorDirector;
-    // s epuede simplificar haciendo primero que 1p sea el punto mas a la dereha y hacer la logica, y por un cambio de variables hacer luego que la var de p1 sea el mmas arriba 
-    if(x1 > ANCHO){float mult = (ANCHO - x1)/xVectorDirector2; x1 = mult*xVectorDirector2 + x1;y1= mult*yVectorDirector2 + y1; }
-    else if(x2 > ANCHO){float mult = (ANCHO - x2)/xVectorDirector; x2 = mult*xVectorDirector + x2;y2= mult*yVectorDirector + y2; }
-    if(x1 < 0){float mult = (- x1)/xVectorDirector2; x1 = mult*xVectorDirector2 + x1;y1= mult*yVectorDirector2 + y1; }
-    else if(x2 < 0){float mult = (- x2)/xVectorDirector; x2 = mult*xVectorDirector + x2;y2= mult*yVectorDirector + y2; }
-    if(y1 > ALTURA){float mult = (ALTURA - y1)/yVectorDirector2; x1 = mult*xVectorDirector2 + x1;y1= mult*yVectorDirector2 + y1; }
-    else if(y2 > ALTURA){float mult = (ALTURA - y2)/yVectorDirector; x2 = mult*xVectorDirector + x2;y2= mult*yVectorDirector + y2; }
-    if(y1 < 0){float mult = (- y1)/yVectorDirector2; x1 = mult*xVectorDirector2 + x1;y1= mult*yVectorDirector2 + y1; }
-    else if(y2 < 0){float mult = (- y2)/yVectorDirector; x2 = mult*xVectorDirector + x2;y2= mult*yVectorDirector + y2; }
-    xVectorDirector = (int) (x2 - x1);
-    yVectorDirector = (int) (y2 - y1);
-
-    if (abs(xVectorDirector) > abs(yVectorDirector)){ CantPixelesADibujar = abs(xVectorDirector);}else{ CantPixelesADibujar = abs(yVectorDirector);}
-    if (CantPixelesADibujar == 0) { pixel = (SDL_Rect) {(int)x1, (int)y1, PIXELSIZE, PIXELSIZE};SDL_FillRect(surface, &pixel, COLOR_WHITE);return;}
-    //la componente mas larga queda en 1, asi se puede sumar de a 1  
-    float xNormalizado = (float) xVectorDirector / CantPixelesADibujar;
-    float yNormalizado = (float) yVectorDirector / CantPixelesADibujar;
-
-
-    for (int i = 0; i <= CantPixelesADibujar; i++) {
-        pixel = (SDL_Rect){(int)x1, (int)y1, PIXELSIZE, PIXELSIZE};
-        SDL_FillRect(surface, &pixel, COLOR_WHITE);
-        x1 += xNormalizado;
-        y1 += yNormalizado;
-    } 
-}
-
-
-punto_t puntos[] ={
-
-{0.5,0.5,0.5},
-{-0.5,0.5,0.5},
-{-0.5,-0.5,0.5},
-{0.5,-0.5,0.5},
-{0.5,0.5,-0.5},
-{-0.5,0.5,-0.5},
-{-0.5,-0.5,-0.5},
-{0.5,-0.5,-0.5}
+punto_t puntos[] = {
+    {-0.5f, -0.5f, -0.5f}, 
+    { 0.5f, -0.5f, -0.5f}, 
+    { 0.5f,  0.5f, -0.5f}, 
+    {-0.5f,  0.5f, -0.5f}, 
+    {-0.5f, -0.5f,  0.5f}, 
+    { 0.5f, -0.5f,  0.5f}, 
+    { 0.5f,  0.5f,  0.5f}, 
+    {-0.5f,  0.5f,  0.5f}  
 };
 
 int poligonos[][3] = {
-{0,1,2},
-{1,2,3}, 
-{4,5,6},
-{5,6,7}, 
-{0,4,7},
-{4,7,3}, 
-{5,6,2},
-{1,5,6}, 
-{1,5,4},
-{0,1,5}, 
-{2,6,7},
-{3,2,6}  
+    {0, 3, 2},
+    {0, 2, 1},
+    {4, 5, 6},
+    {4, 6, 7},
+    {4, 7, 3},
+    {4, 3, 0},
+    {1, 2, 6},
+    {1, 6, 5},
+    {3, 7, 6},
+    {3, 6, 2},
+    {4, 0, 1},
+    {4, 1, 5}
 };
+
+float* zbuffer;
+
 
 void ajustar(){
     for(int i =0 ; i < sizeof(puntos)/sizeof(punto_t); i ++ ){
@@ -122,10 +81,13 @@ void ajustar(){
     }
 }
 void generarRotacionYPasarACopia(){
+        float seno = sin(angulo);
+        float coseno = cos(angulo);
     for(int i =0 ; i < sizeof(puntos)/sizeof(punto_t); i ++ ){
-        copia[i].x =puntos[i].x * cos(angulo) - puntos[i].z * sin(angulo);
+        
+        copia[i].x =puntos[i].x * coseno - puntos[i].z * seno;
         copia[i].y =puntos[i].y;
-        copia[i].z =puntos[i].x * sin(angulo) + puntos[i].z * cos(angulo);
+        copia[i].z =puntos[i].x * seno + puntos[i].z * coseno;
         //copia[i].x =puntos[i].x * cos(angulo) - puntos[i].y * sin(angulo);
         //copia[i].y =puntos[i].x * sin(angulo) + puntos[i].y * cos(angulo);
         //copia[i].z =puntos[i].z;
@@ -148,15 +110,63 @@ void alejarTodos(){
 
 }
 void dibujarPoligono(){
+    if (SDL_LockSurface(surface) != 0) {return;}
+    size_t ancho_real_memoria = surface->pitch / 4;
+    Uint32 *pixels = (Uint32 *)surface->pixels;
+    srand(0); 
     for (int i = 0; i < tamanioPoligonosADibujar; i++){
+        //Uint32 color = rand();
+        Uint32 color = i*10000 +10000;
+
         punto_t *p1 = &poligonosADibujar[i].p1;
         punto_t *p2 = &poligonosADibujar[i].p2;
         punto_t *p3 = &poligonosADibujar[i].p3;
-        dibujarLinea(p1, p2);
-        dibujarLinea(p1, p3);
-        dibujarLinea(p3, p2);
+       
+        int x1 = (int) p1->x;
+        int y1 = (int) p1->y;
+        int x2 = (int) p2->x;
+        int y2 = (int) p2->y;
+        int x3 = (int) p3->x;
+        int y3 = (int) p3->y;
+        float z = (p1->z + p2->z + p3->z) / 3.0f;
+        
+        int boundingBoxminX = (x1 < x2) ? ((x1 < x3) ? x1 : x3) : ((x2 < x3) ? x2 : x3);
+        int boundingBoxminY = (y1 < y2) ? ((y1 < y3) ? y1 : y3) : ((y2 < y3) ? y2 : y3);
+        int boundingBoxmaxX = (x1 > x2) ? ((x1 > x3) ? x1 : x3) : ((x2 > x3) ? x2 : x3);
+        int boundingBoxmaxY = (y1 > y2) ? ((y1 > y3) ? y1 : y3) : ((y2 > y3) ? y2 : y3);
+        
+        // este es el clip 2D, que funciona para sacarse los planos de arriba, abajo , izq y der, pero en casos donde haya poligonos muy grandes puede llegar a haber overflow, haciendo que quede raro, por lo que en un futuro habria que hacer todo en 3Dclip
+        if (boundingBoxminX < 0) boundingBoxminX = 0;
+        if (boundingBoxminY < 0) boundingBoxminY = 0;
+        if (boundingBoxmaxX >= ANCHO)  boundingBoxmaxX = ANCHO -1;
+        if (boundingBoxmaxY >= ALTURA) boundingBoxmaxY = ALTURA -1;
 
+        int d1,d2,d3;
+        int dy12 = y1 - y2;
+        int dx12 = x1 - x2;
+        int dy23 = y2 - y3;
+        int dx23 = x2 - x3;
+        int dy31 = y3 - y1;
+        int dx31 = x3 - x1;        
+
+        for(int y = boundingBoxminY; y<= boundingBoxmaxY; y ++ ){ // y +=PIXELSIZE
+            for(int x = boundingBoxminX; x<= boundingBoxmaxX; x ++){ // x +=PIXELSIZE
+                d1 = (x - x2) * dy12 - (y - y2) * dx12;
+                d2 = (x - x3) * dy23 - (y - y3) * dx23;
+                if ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) {continue;}
+                d3 = (x - x1) * dy31 - (y - y1) * dx31;
+                int tiene_negativos = (d1 < 0) || (d2 < 0) || (d3 < 0);
+                int tiene_positivos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+                if((!(tiene_negativos&&tiene_positivos))&&(z<zbuffer[y * ancho_real_memoria + x])){
+                    //SDL_Rect pixel = (SDL_Rect){x, y, PIXELSIZE, PIXELSIZE};
+                    //SDL_FillRect(surface, &pixel, COLOR_WHITE);
+                    zbuffer[y * ancho_real_memoria + x] = z;
+                    pixels[y * ancho_real_memoria + x] = color;
+                }
+            }
+        }
     }
+    SDL_UnlockSurface(surface);
 }
 
 punto_t jijona(punto_t* dentro, punto_t* afuera){
@@ -168,6 +178,7 @@ punto_t jijona(punto_t* dentro, punto_t* afuera){
         return (punto_t) {vectorDirecotr.x*Intersecccion +afuera->x,vectorDirecotr.y*Intersecccion +afuera->y,NEARPLANE};
         
 }
+
 bool checkeoFueraPantallaPoligono3D(punto_t* p1,punto_t* p2,punto_t* p3){
     bool p1Arriba = p1->y > p1->z;
     bool p1Abajo = p1->y < -p1->z;
@@ -255,9 +266,24 @@ void clip3D(){
     
 }
 
+void coordsAPantalla(){
+    for (int i = 0; i < tamanioPoligonosADibujar; i++){
+        poligonosADibujar[i].p1.x = ((poligonosADibujar[i].p1.x + 1) * ANCHO - PIXELSIZE)/2;
+        poligonosADibujar[i].p1.y = ((1 - poligonosADibujar[i].p1.y) * ALTURA - PIXELSIZE)/2;
+        
+        poligonosADibujar[i].p2.x =((poligonosADibujar[i].p2.x + 1) * ANCHO - PIXELSIZE)/2;
+        poligonosADibujar[i].p2.y =((1 - poligonosADibujar[i].p2.y) * ALTURA - PIXELSIZE)/2;
+        
+        poligonosADibujar[i].p3.x =((poligonosADibujar[i].p3.x + 1) * ANCHO - PIXELSIZE)/2;
+        poligonosADibujar[i].p3.y =((1 - poligonosADibujar[i].p3.y) * ALTURA - PIXELSIZE)/2;
+
+    }
+
+}
+
 int main(){
     SDL_Init(SDL_INIT_VIDEO);
-    window = SDL_CreateWindow("Renderer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,ANCHO , ALTURA, 0);
+    window = SDL_CreateWindow("Renderer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,ALTURA ,ANCHO, 0);
     surface = SDL_GetWindowSurface(window);
     SDL_Rect fondo = (SDL_Rect) {0, 0, ANCHO, ALTURA};
     bool running = true;
@@ -265,6 +291,10 @@ int main(){
     const Uint8 *teclado = SDL_GetKeyboardState(NULL);
     //lineasADibujar = malloc((sizeof(linea_t)*sizeof(poligonos)*3)/sizeof(int[3]));
     poligonosADibujar = malloc((sizeof(poligono_t)*sizeof(poligonos)*2)/sizeof(int[3]));
+    
+    size_t ancho_real_memoria = surface->pitch / 4;
+    zbuffer = malloc(sizeof(float)*ancho_real_memoria*ALTURA);
+    
     copia = malloc(sizeof(puntos));
     while(running){
         while(SDL_PollEvent(&event)){
@@ -286,10 +316,13 @@ int main(){
         if (teclado[SDL_SCANCODE_LEFT]){angulo += PI*DELTATIEMPO;}
         if (teclado[SDL_SCANCODE_RIGHT]){angulo -= PI*DELTATIEMPO;}
 
+        for(int i = 0; i< ALTURA*ancho_real_memoria; i++){zbuffer[i]= 999999.0f;}
+
         generarRotacionYPasarACopia();
         ajustar();
         clip3D();
         alejarTodos();
+        coordsAPantalla();
         
         dibujarPoligono();
 
@@ -299,7 +332,6 @@ int main(){
         SDL_FillRect(surface, &fondo, COLOR_BLACK); 
     }
     free(copia);
-    //free(lineasADibujar);
     free(poligonosADibujar);
     return 0;
 }
