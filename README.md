@@ -43,6 +43,7 @@ El proyecto implementa manualmente las etapas fundamentales de un pipeline de re
 El objetivo principal del proyecto fue comprender cómo funcionan internamente los motores gráficos y los pipelines de renderizado, implementando manualmente cada etapa fundamental utilizando únicamente C y SDL2.
 
 ## Capturas
+(videos de antes de tener renderizado completo de poligonos)
 modelo del pinguino por: https://github.com/Max-Kawula
 ![Render 1](assets/moving_penguin.gif)
 
@@ -65,9 +66,9 @@ Actualmente el proyecto implementa:
 
 El objetivo es evolucionar el renderer hacia un pipeline gráfico más completo:
 
-- [ ] Rasterización de triángulos
-- [ ] Z-Buffer (Depth Buffer)
-- [ ] Back-face culling
+- [x] Rasterización de triángulos
+- [x] Z-Buffer (Depth Buffer)
+- [x] Back-face culling
 - [ ] Iluminación difusa (Lambert)
 - [ ] Iluminación especular (Phong)
 - [ ] Texturas
