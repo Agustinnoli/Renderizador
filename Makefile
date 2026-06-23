@@ -1,5 +1,4 @@
 all:
-	gcc -o renderer graficos.c -g -lm `sdl2-config --cflags --libs`
-
+	gcc -o render main.c render.c parser.c -g -lm `sdl2-config --cflags --libs`
 clean:
 	rm -f renderer
