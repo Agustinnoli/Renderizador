@@ -1,16 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <arpa/inet.h>
 #include <string.h>
-#include <sys/wait.h>
-#include <sys/resource.h>
-#include <sys/epoll.h>
-#include <signal.h>
-#include <errno.h>
 #include <sys/stat.h>
 #include <dirent.h>
-#include <time.h>
 #include "render.h"
 #include "parser.h"
 
