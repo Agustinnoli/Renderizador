@@ -34,13 +34,21 @@ typedef struct modelo {
     size_t cantidadVertices;
     size_t cantidadPoligonos;
     punto3D_t posicion;
-    float rotacion;
+    punto3D_t rotacion;
 } modelo_t;
 
+typedef struct {
+    punto3D_t posicion; 
+    punto3D_t adelante; 
+    punto3D_t arriba;       
+    punto3D_t derecha;    
+} camara_t;
 
 void renderInit(SDL_Surface* surface,SDL_Window* ventana);
-void renderUpdate(void);
+void renderUpdate();
 void renderInput(const Uint8* teclado);
-void renderDestroy(void);
+void renderDestroy();
+void actualizarCamara(float deltaX, float deltaY);
+
 
 #endif

@@ -48,8 +48,10 @@ void parsear(char* file, long fileSize,modelo_t* modelo){
     modelo->vertices = malloc(sizeof(punto3D_t)*modelo->cantidadVertices);
     size_t itPoligonos = 0;
     size_t itVertices = 0;
-    while (*actual) {
 
+    int cantLineas = 0; //esto es para el print nada mas
+
+    while (*actual) {
         if (*actual == 'v' && actual[1] == ' '){
             punto3D_t* punto = &modelo->vertices[itVertices++];
             sscanf(actual,"v %f %f %f",&punto->x,&punto->y,&punto->z);
@@ -91,8 +93,8 @@ void parsear(char* file, long fileSize,modelo_t* modelo){
             }            
         }
 
-        while (*actual && *actual != '\n')actual++;
-        if (*actual == '\n')actual++;
+        while (*actual && *actual != '\n'){actual++;} 
+        if (*actual == '\n'){printf("%d\n",cantLineas++);actual++;} 
     }
     free(file);
 
@@ -131,7 +133,9 @@ int parsearModelos(modelo_t** modelos,size_t* cantidadModelos){
                 char* file = leerArchivo(rutaCompleta, &fileSize);if (!file)continue;
                 
                 modelo_t modelo = {0};
+
                 parsear(file, fileSize,&modelo);
+
                 (*modelos)[itModelos++] = modelo;
             }
 

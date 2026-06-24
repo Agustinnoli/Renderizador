@@ -7,23 +7,24 @@
 #include "render.h"
 #include "parser.h"
 
-
-#define COLOR_WHITE 0xffffffff
+#define COLOR_WHITE 0xFFFFFFFF
 #define COLOR_BLACK 0x00000000
 #define ANCHO 600
 #define ALTURA 600
 #define PIXELSIZE 1
 #define FPS 60
 #define DELTATIEMPO 1.0f/FPS
-#define PI 3.14159
+#define PI 3.14159f
 #define NEARPLANE 0.1f
+#define SENSIBILIDAD 0.002f //ajustado a radianes
+#define VELOCIDAD 3.0f * DELTATIEMPO
+
 SDL_Surface* surface;
 SDL_Window* window;
-float dz = 2;
-float dx = 0;
-float dy = 0;
 
-modelo_t* modeloSeleccionado;
+camara_t camara;
+
+size_t modeloSeleccionado = 0;
 modelo_t* modelos;
 size_t modelosSize;
 
@@ -40,25 +41,33 @@ float* zbuffer;
 void transformarVertices(modelo_t* modelo){
     punto3D_t *vertices = modelo->vertices; 
     size_t cantidadVertices = modelo->cantidadVertices;
+    punto3D_t posicion = modelo->posicion;
+    
+    float senox = sin(modelo->rotacion.x); float cosenox = cos(modelo->rotacion.x); // X (Pitch)
+    float senoy = sin(modelo->rotacion.y); float cosenoy = cos(modelo->rotacion.y); // Y (Yaw)
+    float senoz = sin(modelo->rotacion.z); float cosenoz = cos(modelo->rotacion.z); // Z (Roll)
 
-    //rotar
-    float seno = sin(modelo->rotacion);
-    float coseno = cos(modelo->rotacion);
-    for(int i =0 ; i < cantidadVertices; i ++){
-        VerticesTransformados[i].x = vertices[i].x * coseno - vertices[i].z * seno;
-        VerticesTransformados[i].y = vertices[i].y;
-        VerticesTransformados[i].z = vertices[i].x * seno + vertices[i].z * coseno;
-    }
-    //trasladar
-    punto3D_t posicion =modelo->posicion;
-    for(int i =0 ; i < cantidadVertices; i ++ ){
-        VerticesTransformados[i].x += dx + posicion.x;
-        VerticesTransformados[i].y += dy + posicion.y;
-        VerticesTransformados[i].z += dz + posicion.z;  
+    for(int i = 0; i < cantidadVertices; i++) {
+        float x1,x2,y1,y2,z1,z2;
+        x1 = vertices[i].x;y1 = vertices[i].y;z1 = vertices[i].z;
+
+        //rotar eje z
+        x2 = x1 * cosenoz - y1 * senoz;y2 = x1 * senoz + y1 * cosenoz;z2 = z1;
+        //rotar eje x
+        x1 = x2;y1 = y2 * cosenox - z2 * senox;z1 = y2 * senox + z2 * cosenox;
+        //rotar eje y
+        x2 = x1 * cosenoy + z1 * senoy;y2 = y1;z2 = -x1 * senoy + z1 * cosenoy;
+        // posicion mundo
+        x1 = x2 + posicion.x - camara.posicion.x;
+        y1 = y2 + posicion.y - camara.posicion.y;
+        z1 = z2 + posicion.z - camara.posicion.z;
+
+        //rotar camara
+        VerticesTransformados[i].x = x1 * camara.derecha.x + y1 * camara.derecha.y + z1 * camara.derecha.z;
+        VerticesTransformados[i].y = x1 * camara.arriba.x  + y1 * camara.arriba.y  + z1 * camara.arriba.z;
+        VerticesTransformados[i].z = x1 * camara.adelante.x + y1 * camara.adelante.y + z1 * camara.adelante.z;
     }
 }
-
-
 
 
 punto2D_t coordsAPantalla(float x, float y){
@@ -114,7 +123,7 @@ void dibujarPoligono(){
         int dp3x1 = p3.x - p1.x;        
         int DobleAreaP1P2P3 = (p1.x - p3.x) * dp2p3y - (p1.y - p3.y) * dp2p3x;
         
-        //para la mejor obtimizacion habria que poner este if arriba de todo        
+        //para la mejor optimizacion habria que poner este if arriba de todo        
         if (DobleAreaP1P2P3 <= 0) continue; //backfaceculling, esto es igual al componente z de la normal del triangulo, si es negativo el triangulo se aleja de la camara por lo que no se va a notar y se poda
 
         for(int y = boundingBoxminY; y<= boundingBoxmaxY; y ++ ){ // y +=PIXELSIZE
@@ -132,8 +141,6 @@ void dibujarPoligono(){
                 
                 bool positivos = (lambda1 >= 0) && (lambda2 >= 0) && (lambda3 >= 0);
                 if(positivos&&(z<=zbuffer[y * ancho_real_memoria + x])){
-                    //SDL_Rect pixel = (SDL_Rect){x, y, PIXELSIZE, PIXELSIZE};
-                    //SDL_FillRect(surface, &pixel, COLOR_WHITE);
                     zbuffer[y * ancho_real_memoria + x] = z;
                     pixels[y * ancho_real_memoria + x] = color;
                 }
@@ -151,8 +158,6 @@ punto3D_t interseccionNearPlane(punto3D_t* dentro, punto3D_t* afuera){
 }
 
 bool checkeoFueraPantallaPoligono3D(punto3D_t* p1, punto3D_t* p2, punto3D_t* p3){
-  
-
     float z1_margin = p1->z * 3;float z2_margin = p2->z * 3;float z3_margin = p3->z * 3;
 
     bool p1Arriba = p1->y > z1_margin;  bool p2Arriba = p2->y > z2_margin;  bool p3Arriba = p3->y > z3_margin;
@@ -167,7 +172,8 @@ bool checkeoFueraPantallaPoligono3D(punto3D_t* p1, punto3D_t* p2, punto3D_t* p3)
     bool p1Izquierda = p1->x < -z1_margin; bool p2Izquierda = p2->x < -z2_margin; bool p3Izquierda = p3->x < -z3_margin; 
     bool estaIzquierda = p1Izquierda && p2Izquierda && p3Izquierda;
 
-    return estaArriba || estaAbajo || estaDerecha || estaIzquierda;    
+    return false;
+    //return estaArriba || estaAbajo || estaDerecha || estaIzquierda;    
 }
 
 
@@ -198,41 +204,41 @@ void clip3D(modelo_t* modelo){
             switch (yay){
                 case 0b000://ninguno afuera
                     if(checkeoFueraPantallaPoligono3D(&p1,&p2,&p3)){continue;}
-                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p2,p3};
+                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p3,p2};
                 continue;
                 break;
                 case 0b001://p1 afuera
                     caso1Afuera(&p1,&p2,&p3,&temp);
-                    if(!checkeoFueraPantallaPoligono3D(&temp,&p2,&p3)){poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {temp,p2,p3};}                    
+                    if(!checkeoFueraPantallaPoligono3D(&temp,&p2,&p3)){poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {temp,p3,p2};}                    
                     if(checkeoFueraPantallaPoligono3D(&p1,&p2,&temp)){continue;;}
-                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p2,temp};
+                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,temp,p2};
                 break;
                 case 0b010://p2 afuera
                     caso1Afuera(&p2,&p1,&p3,&temp);
-                    if(!checkeoFueraPantallaPoligono3D(&temp,&p2,&p3)){poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p2,temp,p3};}
+                    if(!checkeoFueraPantallaPoligono3D(&temp,&p2,&p3)){poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p2,p3,temp};}
                     if(checkeoFueraPantallaPoligono3D(&temp,&p2,&p1)){continue;;}
-                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p2,p3};
+                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p3,p2};
                 break;
                 case 0b100://p3 afuera
                     caso1Afuera(&p3,&p2,&p1,&temp);
-                    if(!checkeoFueraPantallaPoligono3D(&temp,&p2,&p3)){poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {temp,p2,p3};}
+                    if(!checkeoFueraPantallaPoligono3D(&temp,&p2,&p3)){poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {temp,p3,p2};}
                     if(checkeoFueraPantallaPoligono3D(&temp,&p2,&p1)){continue;;}
-                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p2,temp};
+                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,temp,p2};
                 break;
                 case 0b011://p1 p2 afuera
                     caso2Afuera(&p1,&p2,&p3);
                     if(checkeoFueraPantallaPoligono3D(&p1,&p2,&p3)){continue;}
-                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p2,p3};
+                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p3,p2};
                 break;
                 case 0b101://p1 p3 afuera
                     caso2Afuera(&p1,&p3,&p2);
                     if(checkeoFueraPantallaPoligono3D(&p2,&p1,&p3)){continue;}
-                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p2,p3};
+                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p3,p2};
                 break;
                 case 0b110://p2 p3 afuera
                     caso2Afuera(&p3,&p2,&p1);
                     if(checkeoFueraPantallaPoligono3D(&p2,&p1,&p3)){continue;}
-                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p2,p3};
+                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p3,p2};
                 break;
                 case 0b111://p1 p2 p3 afuera
                     continue;
@@ -242,18 +248,19 @@ void clip3D(modelo_t* modelo){
 }
 void renderInit(SDL_Surface* superficie,SDL_Window* ventana){
     modelosSize = 0;
-    
+
     parsearModelos(&modelos,&modelosSize);
-    
+
     surface = superficie;
     window = ventana;
+    
+    camara = (camara_t) {{0.0f, 0.0f, 2.0f}, {0,0,-1}, {0,1,0}, {1,0,0}};
+
     anchoRealMemoria = surface->pitch / 4;
     
-    modeloSeleccionado = NULL;
     size_t maxVerticesSize= 0;
     size_t maxPoligonosSize = 0;
     if(modelosSize != 0){
-        modeloSeleccionado = &modelos[0];
         modelos[0].posicion = (punto3D_t) {(float) 0.0f,0.0f,0.0f};
 
         maxVerticesSize= modelos[0].cantidadVertices;
@@ -261,7 +268,7 @@ void renderInit(SDL_Surface* superficie,SDL_Window* ventana){
         for (int i = 1; i< modelosSize;i++ ){
             if(modelos[i].cantidadVertices > maxVerticesSize)  maxVerticesSize =modelos[i].cantidadVertices;
             if(modelos[i].cantidadPoligonos > maxPoligonosSize)  maxPoligonosSize =modelos[i].cantidadPoligonos;
-            modelos[i].posicion = (punto3D_t) {(float) (i*1.5),0.0f, 0.0f};
+            modelos[i].posicion = (punto3D_t) {(float) (i*1.5),(i*1.5), (i*1.5)};
         }
     }
     VerticesTransformados = malloc(sizeof(punto3D_t) * maxVerticesSize);
@@ -270,9 +277,10 @@ void renderInit(SDL_Surface* superficie,SDL_Window* ventana){
     zbuffer = malloc(sizeof(float)*anchoRealMemoria*ALTURA);
     
 }
+
 void renderUpdate(){
         SDL_Rect fondo = (SDL_Rect) {0, 0, ANCHO, ALTURA};
-
+        
         for(int i = 0; i< ALTURA*anchoRealMemoria; i++){zbuffer[i]= INFINITY;}
         
         SDL_FillRect(surface, &fondo, COLOR_BLACK);
@@ -283,20 +291,109 @@ void renderUpdate(){
             proyectar2D();
             dibujarPoligono();
         }
-        
-
         SDL_PumpEvents();
         SDL_UpdateWindowSurface(window);
 }
+
+
+static punto3D_t rotar(punto3D_t v, punto3D_t eje, float angulo) {
+    float coseno = cos(angulo), s = sin(angulo);
+    float productoCruz = eje.x*v.x + eje.y*v.y + eje.z*v.z;
+    punto3D_t cruz = {
+        eje.y*v.z - eje.z*v.y,
+        eje.z*v.x - eje.x*v.z,
+        eje.x*v.y - eje.y*v.x
+    };
+    return (punto3D_t){
+        v.x*coseno + cruz.x*s + eje.x*productoCruz*(1-coseno),
+        v.y*coseno + cruz.y*s + eje.y*productoCruz*(1-coseno),
+        v.z*coseno + cruz.z*s + eje.z*productoCruz*(1-coseno)
+    };
+}
+
+static punto3D_t normalizar(punto3D_t v) {
+    float len = sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+    return (punto3D_t){v.x/len, v.y/len, v.z/len};
+}
+
+void actualizarCamara(float deltaX, float deltaY) {
+
+    punto3D_t ejeY = {0, 1, 0};
+    camara.adelante = normalizar(rotar(camara.adelante, ejeY, -deltaX * SENSIBILIDAD));
+    camara.derecha  = normalizar(rotar(camara.derecha,  ejeY, -deltaX * SENSIBILIDAD));
+    camara.adelante = normalizar(rotar(camara.adelante, camara.derecha, deltaY * SENSIBILIDAD));
+
+    camara.arriba = (punto3D_t){
+        camara.derecha.y * camara.adelante.z - camara.derecha.z * camara.adelante.y,
+        camara.derecha.z * camara.adelante.x - camara.derecha.x * camara.adelante.z,
+        camara.derecha.x * camara.adelante.y - camara.derecha.y * camara.adelante.x
+    };
+}
 void renderInput(const Uint8* teclado){
-        if (teclado[SDL_SCANCODE_W]){dz -= DELTATIEMPO;} 
-        if (teclado[SDL_SCANCODE_S]){dz += DELTATIEMPO;} 
-        if (teclado[SDL_SCANCODE_A]){dx += DELTATIEMPO;} 
-        if (teclado[SDL_SCANCODE_D]){dx -= DELTATIEMPO;} 
-        if (teclado[SDL_SCANCODE_SPACE]){dy -= DELTATIEMPO;}
-        if (teclado[SDL_SCANCODE_LSHIFT]){dy += DELTATIEMPO;}
-        if (teclado[SDL_SCANCODE_LEFT]){modeloSeleccionado->rotacion += PI*DELTATIEMPO;}
-        if (teclado[SDL_SCANCODE_RIGHT]){modeloSeleccionado->rotacion -= PI*DELTATIEMPO;}
+        if (teclado[SDL_SCANCODE_W]) {
+            camara.posicion.x += camara.adelante.x * VELOCIDAD;
+            camara.posicion.y += camara.adelante.y * VELOCIDAD; 
+            camara.posicion.z += camara.adelante.z * VELOCIDAD;
+        }
+        if (teclado[SDL_SCANCODE_S]) {
+            camara.posicion.x -= camara.adelante.x * VELOCIDAD;
+            camara.posicion.y -= camara.adelante.y * VELOCIDAD;
+            camara.posicion.z -= camara.adelante.z * VELOCIDAD;
+        }
+        if (teclado[SDL_SCANCODE_A]) {
+            camara.posicion.x -= camara.derecha.x * VELOCIDAD;
+            camara.posicion.z -= camara.derecha.z * VELOCIDAD;
+        }
+        if (teclado[SDL_SCANCODE_D]) {
+            camara.posicion.x += camara.derecha.x * VELOCIDAD;
+            camara.posicion.z += camara.derecha.z * VELOCIDAD;
+        }
+        if (teclado[SDL_SCANCODE_SPACE]) {
+            camara.posicion.x += camara.arriba.x * VELOCIDAD;
+            camara.posicion.y += camara.arriba.y * VELOCIDAD;
+            camara.posicion.z += camara.arriba.z * VELOCIDAD;
+        }
+        if (teclado[SDL_SCANCODE_LSHIFT]) {
+            camara.posicion.x -= camara.arriba.x * VELOCIDAD;
+            camara.posicion.y -= camara.arriba.y * VELOCIDAD;
+            camara.posicion.z -= camara.arriba.z * VELOCIDAD;
+        }
+        if (teclado[SDL_SCANCODE_R]) {
+            modelos[modeloSeleccionado].posicion.x += camara.adelante.x * VELOCIDAD;
+            modelos[modeloSeleccionado].posicion.y += camara.adelante.y * VELOCIDAD; 
+            modelos[modeloSeleccionado].posicion.z += camara.adelante.z * VELOCIDAD;
+        }
+        if (teclado[SDL_SCANCODE_Y]) {
+            modelos[modeloSeleccionado].posicion.x -= camara.adelante.x * VELOCIDAD;
+            modelos[modeloSeleccionado].posicion.y -= camara.adelante.y * VELOCIDAD;
+            modelos[modeloSeleccionado].posicion.z -= camara.adelante.z * VELOCIDAD;
+        }
+        if (teclado[SDL_SCANCODE_F]) {
+            modelos[modeloSeleccionado].posicion.x -= camara.derecha.x * VELOCIDAD;
+            modelos[modeloSeleccionado].posicion.z -= camara.derecha.z * VELOCIDAD;
+        }
+        if (teclado[SDL_SCANCODE_H]) {
+            modelos[modeloSeleccionado].posicion.x += camara.derecha.x * VELOCIDAD;
+            modelos[modeloSeleccionado].posicion.z += camara.derecha.z * VELOCIDAD;
+        }
+        if (teclado[SDL_SCANCODE_T]) {
+            modelos[modeloSeleccionado].posicion.x += camara.arriba.x * VELOCIDAD;
+            modelos[modeloSeleccionado].posicion.y += camara.arriba.y * VELOCIDAD;
+            modelos[modeloSeleccionado].posicion.z += camara.arriba.z * VELOCIDAD;
+        }
+        if (teclado[SDL_SCANCODE_G]) {
+            modelos[modeloSeleccionado].posicion.x -= camara.arriba.x * VELOCIDAD;
+            modelos[modeloSeleccionado].posicion.y -= camara.arriba.y * VELOCIDAD;
+            modelos[modeloSeleccionado].posicion.z -= camara.arriba.z * VELOCIDAD;
+        }
+        if (teclado[SDL_SCANCODE_E]) { modeloSeleccionado = (modeloSeleccionado == 0) ? modelosSize - 1 : modeloSeleccionado - 1;}
+        if (teclado[SDL_SCANCODE_Q]){modeloSeleccionado = (modeloSeleccionado + 1)% modelosSize;}
+        if (teclado[SDL_SCANCODE_I]){modelos[modeloSeleccionado].rotacion.x += PI*DELTATIEMPO;}
+        if (teclado[SDL_SCANCODE_K]){modelos[modeloSeleccionado].rotacion.x -= PI*DELTATIEMPO;} 
+        if (teclado[SDL_SCANCODE_J]){modelos[modeloSeleccionado].rotacion.y += PI*DELTATIEMPO;}
+        if (teclado[SDL_SCANCODE_L]){modelos[modeloSeleccionado].rotacion.y -= PI*DELTATIEMPO;}
+        if (teclado[SDL_SCANCODE_U]){modelos[modeloSeleccionado].rotacion.z += PI*DELTATIEMPO;}
+        if (teclado[SDL_SCANCODE_O]){modelos[modeloSeleccionado].rotacion.z -= PI*DELTATIEMPO;}
 };
 void renderDestroy(){
     free(VerticesTransformados);
