@@ -89,6 +89,7 @@ modelo del pingüino por: https://github.com/Max-Kawula
 - [x] Carga de modelos `.obj`
 - [x] Cámara libre (rotación 360° sin gimbal lock, via Rodrigues)
 - [x] Soporte para múltiples modelos simultáneos
+- [x] Frustum culling por bounding box
 
 ## Próximos Pasos
 

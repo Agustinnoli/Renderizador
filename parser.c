@@ -127,6 +127,7 @@ int parsearModelos(modelo_t** modelos,size_t* cantidadModelos){
                 modelo_t modelo = {0};
 
                 parsear(file, fileSize,&modelo);
+                modelo.boundingBox = malloc(8*sizeof(punto3D_t));
 
                 (*modelos)[itModelos++] = modelo;
             }

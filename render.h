@@ -28,20 +28,22 @@ typedef struct poligono2D {
     punto2D_t p3;
 } poligono2D_t;
 
-typedef struct modelo {
+typedef struct modelo { //entra dentro de una cacheline? no, habria que hacer un makkic para la bounding box 
     punto3D_t *vertices;
     int (*poligonos)[3];
     size_t cantidadVertices;
     size_t cantidadPoligonos;
     punto3D_t posicion;
     punto3D_t rotacion;
+    punto3D_t (*boundingBox)[8]; 
 } modelo_t;
+enum boundingBox {minXminYminZ,maxXminYminZ,minXmaxYminZ,minXminYmaxZ,maxXmaxYminZ,minXmaxYmaxZ,maxXminYmaxZ,maxXmaxYmaxZ,BoundingBoxSize};
 
 typedef struct {
     punto3D_t posicion; 
     punto3D_t adelante; 
     punto3D_t arriba;       
-    punto3D_t derecha;    
+    punto3D_t derecha;
 } camara_t;
 
 void renderInit(SDL_Surface* surface,SDL_Window* ventana);

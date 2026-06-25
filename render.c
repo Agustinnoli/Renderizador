@@ -85,7 +85,41 @@ void proyectar2D(){
         }
     }
 }
+static Uint32 colorPorPosicion(punto3D_t p1, punto3D_t p2, punto3D_t p3) {
+    // centroide del triángulo en espacio mundo
+    float cx = (p1.x + p2.x + p3.x) / 3.0f;
+    float cy = (p1.y + p2.y + p3.y) / 3.0f;
+    float cz = (p1.z + p2.z + p3.z) / 3.0f;
 
+    // mapear posicion a hue (0.0 - 1.0)
+    // podés ajustar la escala según el tamaño de tu escena
+    float hue = fmodf((cx * 0.3f + cy * 0.5f + cz * 0.7f), 1.0f);
+    if (hue < 0) hue += 1.0f;
+
+    // HSV a RGB (S=0.8, V=0.9 para colores vivos pero no saturados al máximo)
+    float s = 0.8f, v = 0.9f;
+    float h6 = hue * 6.0f;
+    int   hi = (int)h6 % 6;
+    float f  = h6 - (int)h6;
+    float p  = v * (1.0f - s);
+    float q  = v * (1.0f - s * f);
+    float t  = v * (1.0f - s * (1.0f - f));
+
+    float r, g, b;
+    switch (hi) {
+        case 0: r=v; g=t; b=p; break;
+        case 1: r=q; g=v; b=p; break;
+        case 2: r=p; g=v; b=t; break;
+        case 3: r=p; g=q; b=v; break;
+        case 4: r=t; g=p; b=v; break;
+        default:r=v; g=p; b=q; break;
+    }
+
+    Uint8 R = (Uint8)(r * 255);
+    Uint8 G = (Uint8)(g * 255);
+    Uint8 B = (Uint8)(b * 255);
+    return (R << 16) | (G << 8) | B;
+}
 
 void dibujarPoligono(){
     if (SDL_LockSurface(surface) != 0) {return;}
@@ -94,7 +128,7 @@ void dibujarPoligono(){
     srand(0); 
     for (int i = 0; i < poligonosClipeadosSize; i++){
         //Uint32 color = rand();
-        Uint32 color = i*10000 +10000;
+        
 
         punto2D_t p1 = poligonosADibujar[i].p1;
         punto2D_t p2 = poligonosADibujar[i].p2;
@@ -126,8 +160,8 @@ void dibujarPoligono(){
         //para la mejor optimizacion habria que poner este if arriba de todo        
         if (DobleAreaP1P2P3 <= 0) continue; //backfaceculling, esto es igual al componente z de la normal del triangulo, si es negativo el triangulo se aleja de la camara por lo que no se va a notar y se poda
 
-        for(int y = boundingBoxminY; y<= boundingBoxmaxY; y ++ ){ // y +=PIXELSIZE
-            for(int x = boundingBoxminX; x<= boundingBoxmaxX; x ++){ // x +=PIXELSIZE
+        for(int y = boundingBoxminY; y<= boundingBoxmaxY ; y ++ ){ // y +=PIXELSIZE
+            for(int x = boundingBoxminX; x<= boundingBoxmaxX ; x ++){ // x +=PIXELSIZE
                 
                 int dobleAreaP1P2P4 = (x - p2.x) * dp1p2y - (y - p2.y) * dp1p2x;
                 int dobleAreaP2P3P4 = (x - p3.x) * dp2p3y - (y - p3.y) * dp2p3x;
@@ -138,8 +172,9 @@ void dibujarPoligono(){
                 float lambda3 = 1.0f - lambda1 - lambda2;
                 
                 float z = 1.0f/((lambda1*(1.0f/z1)) + (lambda2*(1.0f/z2)) + (lambda3*(1.0f/z3)));
-                
-                bool positivos = (lambda1 >= 0) && (lambda2 >= 0) && (lambda3 >= 0);
+                Uint32 color = (Uint8)(x * 0.4f) << 8 | (Uint8)(y * 0.4f) << 0 | (Uint8)(z * 0.4f) << 16;
+
+                bool positivos = (lambda1 >= -0.0001f) && (lambda2 >= -0.0001f) && (lambda3 >= -0.0001f);
                 if(positivos&&(z<=zbuffer[y * ancho_real_memoria + x])){
                     zbuffer[y * ancho_real_memoria + x] = z;
                     pixels[y * ancho_real_memoria + x] = color;
@@ -172,8 +207,8 @@ bool checkeoFueraPantallaPoligono3D(punto3D_t* p1, punto3D_t* p2, punto3D_t* p3)
     bool p1Izquierda = p1->x < -z1_margin; bool p2Izquierda = p2->x < -z2_margin; bool p3Izquierda = p3->x < -z3_margin; 
     bool estaIzquierda = p1Izquierda && p2Izquierda && p3Izquierda;
 
-    return false;
-    //return estaArriba || estaAbajo || estaDerecha || estaIzquierda;    
+    //return false;
+    return estaArriba || estaAbajo || estaDerecha || estaIzquierda;    
 }
 
 
@@ -197,47 +232,41 @@ void clip3D(modelo_t* modelo){
             punto3D_t p2 = VerticesTransformados[modelo->poligonos[i][1]];
             punto3D_t p3 = VerticesTransformados[modelo->poligonos[i][2]];
 
+            if(checkeoFueraPantallaPoligono3D(&p1,&p2,&p3)){continue;}
             yay = 0;
             if(p1.z < NEARPLANE){ yay |= 0b001;}
             if(p2.z < NEARPLANE){ yay |= 0b010;}// esto podria ser un enum 
             if(p3.z < NEARPLANE){ yay |= 0b100;}
             switch (yay){
                 case 0b000://ninguno afuera
-                    if(checkeoFueraPantallaPoligono3D(&p1,&p2,&p3)){continue;}
                     poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p3,p2};
                 continue;
                 break;
                 case 0b001://p1 afuera
                     caso1Afuera(&p1,&p2,&p3,&temp);
-                    if(!checkeoFueraPantallaPoligono3D(&temp,&p2,&p3)){poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {temp,p3,p2};}                    
-                    if(checkeoFueraPantallaPoligono3D(&p1,&p2,&temp)){continue;;}
+                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {temp,p3,p2};                   
                     poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,temp,p2};
                 break;
                 case 0b010://p2 afuera
                     caso1Afuera(&p2,&p1,&p3,&temp);
-                    if(!checkeoFueraPantallaPoligono3D(&temp,&p2,&p3)){poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p2,p3,temp};}
-                    if(checkeoFueraPantallaPoligono3D(&temp,&p2,&p1)){continue;;}
+                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p2,p3,temp};
                     poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p3,p2};
                 break;
                 case 0b100://p3 afuera
                     caso1Afuera(&p3,&p2,&p1,&temp);
-                    if(!checkeoFueraPantallaPoligono3D(&temp,&p2,&p3)){poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {temp,p3,p2};}
-                    if(checkeoFueraPantallaPoligono3D(&temp,&p2,&p1)){continue;;}
+                    poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {temp,p3,p2};
                     poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,temp,p2};
                 break;
                 case 0b011://p1 p2 afuera
                     caso2Afuera(&p1,&p2,&p3);
-                    if(checkeoFueraPantallaPoligono3D(&p1,&p2,&p3)){continue;}
                     poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p3,p2};
                 break;
                 case 0b101://p1 p3 afuera
                     caso2Afuera(&p1,&p3,&p2);
-                    if(checkeoFueraPantallaPoligono3D(&p2,&p1,&p3)){continue;}
                     poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p3,p2};
                 break;
                 case 0b110://p2 p3 afuera
                     caso2Afuera(&p3,&p2,&p1);
-                    if(checkeoFueraPantallaPoligono3D(&p2,&p1,&p3)){continue;}
                     poligonosClipeados[poligonosClipeadosSize++] = (poligono3D_t) {p1,p3,p2};
                 break;
                 case 0b111://p1 p2 p3 afuera
@@ -246,10 +275,38 @@ void clip3D(modelo_t* modelo){
             }
     }
 }
+void modelosEncontrarBoundingBox(modelo_t* modelos) {
+    for (int i = 0; i < modelosSize; i++) {
+        modelo_t* modelo = &modelos[i]; 
+        
+        float minX = modelo->vertices[0].x, maxX = modelo->vertices[0].x;
+        float minY = modelo->vertices[0].y, maxY = modelo->vertices[0].y;
+        float minZ = modelo->vertices[0].z, maxZ = modelo->vertices[0].z;
+
+        for (int j = 1; j < modelo->cantidadVertices; j++) {
+            punto3D_t p = modelo->vertices[j];
+            if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+            if (p.z < minZ) minZ = p.z; if (p.z > maxZ) maxZ = p.z;
+        }
+
+        (*modelo->boundingBox)[minXminYminZ] = (punto3D_t){minX, minY, minZ};
+        (*modelo->boundingBox)[maxXminYminZ] = (punto3D_t){maxX, minY, minZ};
+        (*modelo->boundingBox)[minXmaxYminZ] = (punto3D_t){minX, maxY, minZ};
+        (*modelo->boundingBox)[minXminYmaxZ] = (punto3D_t){minX, minY, maxZ};
+        (*modelo->boundingBox)[maxXmaxYminZ] = (punto3D_t){maxX, maxY, minZ};
+        (*modelo->boundingBox)[minXmaxYmaxZ] = (punto3D_t){minX, maxY, maxZ};
+        (*modelo->boundingBox)[maxXminYmaxZ] = (punto3D_t){maxX, minY, maxZ};
+        (*modelo->boundingBox)[maxXmaxYmaxZ] = (punto3D_t){maxX, maxY, maxZ};
+    }
+}
+
 void renderInit(SDL_Surface* superficie,SDL_Window* ventana){
     modelosSize = 0;
 
     parsearModelos(&modelos,&modelosSize);
+
+    modelosEncontrarBoundingBox(modelos);
 
     surface = superficie;
     window = ventana;
@@ -278,6 +335,48 @@ void renderInit(SDL_Surface* superficie,SDL_Window* ventana){
     
 }
 
+bool modeloFueraDelFrustrum(modelo_t* modelo) {
+    punto3D_t transformados[BoundingBoxSize];
+    
+    punto3D_t posicion = modelo->posicion;
+    float senox = sin(modelo->rotacion.x); float cosenox = cos(modelo->rotacion.x);
+    float senoy = sin(modelo->rotacion.y); float cosenoy = cos(modelo->rotacion.y);
+    float senoz = sin(modelo->rotacion.z); float cosenoz = cos(modelo->rotacion.z);
+
+    for (int i = 0; i < BoundingBoxSize; i++) {
+        float x1, x2, y1, y2, z1, z2;
+        x1 = (*modelo->boundingBox)[i].x;
+        y1 = (*modelo->boundingBox)[i].y;
+        z1 = (*modelo->boundingBox)[i].z;
+
+        x2 = x1*cosenoz - y1*senoz; y2 = x1*senoz + y1*cosenoz; z2 = z1;
+        x1 = x2; y1 = y2*cosenox - z2*senox; z1 = y2*senox + z2*cosenox;
+        x2 = x1*cosenoy + z1*senoy; y2 = y1; z2 = -x1*senoy + z1*cosenoy;
+
+        x1 = x2 + posicion.x - camara.posicion.x;
+        y1 = y2 + posicion.y - camara.posicion.y;
+        z1 = z2 + posicion.z - camara.posicion.z;
+
+        transformados[i].x = x1*camara.derecha.x  + y1*camara.derecha.y  + z1*camara.derecha.z;
+        transformados[i].y = x1*camara.arriba.x   + y1*camara.arriba.y   + z1*camara.arriba.z;
+        transformados[i].z = x1*camara.adelante.x + y1*camara.adelante.y + z1*camara.adelante.z;
+    }
+
+    int fueraIzquierda=0, fueraDerecha=0, fueraArriba=0, fueraAbajo=0, fueraNear=0;
+    for (int i = 0; i < BoundingBoxSize; i++) {
+        punto3D_t p = transformados[i];
+        if (p.z < NEARPLANE)  fueraNear++;
+        if (p.x < -p.z) fueraIzquierda++;
+        else if (p.x > p.z) fueraDerecha++;
+        if (p.y < -p.z) fueraAbajo++;
+        else if (p.y > p.z) fueraArriba++;
+    }
+
+    return (fueraNear    == BoundingBoxSize) || (fueraIzquierda == BoundingBoxSize) || (fueraDerecha   == BoundingBoxSize) || (fueraAbajo     == BoundingBoxSize) || (fueraArriba    == BoundingBoxSize);
+
+}
+
+
 void renderUpdate(){
         SDL_Rect fondo = (SDL_Rect) {0, 0, ANCHO, ALTURA};
         
@@ -286,6 +385,7 @@ void renderUpdate(){
         SDL_FillRect(surface, &fondo, COLOR_BLACK);
         for(int i= 0; i< modelosSize; i++){
             modelo_t modelo = modelos[i];
+            if(modeloFueraDelFrustrum(&modelo)) continue;
             transformarVertices(&modelo);
             clip3D(&modelo);
             proyectar2D();
@@ -403,6 +503,7 @@ void renderDestroy(){
     for(int i = 0; i<modelosSize; i++){
         free(modelos[i].poligonos);
         free(modelos[i].vertices);
+        free(modelos[i].boundingBox);
     }
     free(modelos);
 }
