@@ -68,15 +68,11 @@ El proyecto implementa manualmente las etapas fundamentales de un pipeline de re
 
 ## Capturas
 
-(videos de antes de tener renderizado completo de polígonos)
+![Render 1](assets/utahTeapot.gif)
 
-modelo del pingüino por: https://github.com/Max-Kawula
+![Render 2](assets/cubos1.gif)
 
-![Render 1](assets/moving_penguin.gif)
-
-![Render 2](assets/spinning_cube.gif)
-
-![Render 3](assets/spinning_penguin.gif)
+![Render 3](assets/cubos2.gif)
 
 ## Estado Actual
 
