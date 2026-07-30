@@ -68,44 +68,7 @@ El proyecto implementa manualmente las etapas fundamentales de un pipeline de re
 
 ## Capturas
 
-![Render 1](assets/utahTeapot.gif)
+![Render 1](assets/tetera1.gif)
 
-![Render 2](assets/cubos1.gif)
+![Render 2](assets/tetera2.gif)
 
-![Render 3](assets/cubos2.gif)
-
-## Estado Actual
-
-- [x] Transformaciones 3D (rotación por los tres ejes, traslación)
-- [x] Proyección en perspectiva
-- [x] Clipping contra el near plane (casos 0/1/2 vértices)
-- [x] Rasterización de triángulos con coordenadas baricéntricas
-- [x] Z-Buffer con corrección de perspectiva
-- [x] Back-face culling
-- [x] Carga de modelos `.obj`
-- [x] Cámara libre (rotación 360° sin gimbal lock, via Rodrigues)
-- [x] Soporte para múltiples modelos simultáneos
-- [x] Frustum culling por bounding box
-
-## Próximos Pasos
-
-- [ ] Iluminación difusa (Lambert)
-- [ ] Iluminación especular (Phong)
-- [ ] Texturas UV
-- [ ] Top-left fill rule (artefactos en bordes compartidos)
-- [ ] Frustum clipping completo (planos arriba/abajo/izquierda/derecha)
-- [ ] Soporte de quads en el parser `.obj`
-- [ ] Optimizaciones de rendimiento
-
-## Aprendizajes
-
-Durante el desarrollo de este proyecto se trabajó con:
-
-- Programación de bajo nivel en C.
-- Manejo manual de memoria (`malloc`, `free`, aritmética de punteros).
-- Estructuras matemáticas para gráficos 3D (vectores, productos cruz y punto, rotaciones).
-- Algoritmos de clipping geométrico.
-- Interpolación baricéntrica y corrección de perspectiva en el z-buffer.
-- Rotación de cámara libre mediante la fórmula de Rodrigues (sin gimbal lock).
-- Parseo de archivos `.obj` y manejo de múltiples formatos de cara.
-- Arquitectura modular de un renderizador por software.

@@ -18,13 +18,14 @@
 #define NEARPLANE 0.1f
 #define SENSIBILIDAD 0.002f //ajustado a radianes
 #define VELOCIDAD 3.0f * DELTATIEMPO
+#define POTENCIA_LUZ 100.0f
+float LUZ_AMBIENTAL = 0.2f;
 
 SDL_Surface* surface;
 SDL_Window* window;
 
 camara_t camara;
 
-size_t modeloSeleccionado = 0;
 modelo_t* modelos;
 size_t modelosSize;
 
@@ -38,18 +39,29 @@ poligono2D_t* poligonosADibujar;
 size_t anchoRealMemoria;
 float* zbuffer;
 
-void transformarVertices(modelo_t* modelo){
-    punto3D_t *vertices = modelo->vertices; 
-    size_t cantidadVertices = modelo->cantidadVertices;
-    punto3D_t posicion = modelo->posicion;
-    
-    float senox = sin(modelo->rotacion.x); float cosenox = cos(modelo->rotacion.x); // X (Pitch)
-    float senoy = sin(modelo->rotacion.y); float cosenoy = cos(modelo->rotacion.y); // Y (Yaw)
-    float senoz = sin(modelo->rotacion.z); float cosenoz = cos(modelo->rotacion.z); // Z (Roll)
 
-    for(int i = 0; i < cantidadVertices; i++) {
+int lucesSize;
+luz_t* luces;
+punto3D_t* lucesTransformadas;
+
+
+size_t objetoSeleccionado = 0;
+objeto_t** objetos;
+size_t objetosSize;
+
+static inline punto3D_t normalizar(punto3D_t v) {
+    float len = sqrtf(v.x*v.x + v.y*v.y + v.z*v.z);
+    return (punto3D_t){v.x/len, v.y/len, v.z/len};
+}
+
+static inline void transformarPuntos(punto3D_t* input, punto3D_t* output, size_t size,const punto3D_t* posicion,const punto3D_t* rotacion){
+    float senox = sin(rotacion->x), cosenox = cos(rotacion->x);
+    float senoy = sin(rotacion->y), cosenoy = cos(rotacion->y);
+    float senoz = sin(rotacion->z), cosenoz = cos(rotacion->z);
+
+    for(int i = 0; i < size; i++){
         float x1,x2,y1,y2,z1,z2;
-        x1 = vertices[i].x;y1 = vertices[i].y;z1 = vertices[i].z;
+        x1 = input[i].x;y1 = input[i].y;z1 = input[i].z;
 
         //rotar eje z
         x2 = x1 * cosenoz - y1 * senoz;y2 = x1 * senoz + y1 * cosenoz;z2 = z1;
@@ -58,15 +70,20 @@ void transformarVertices(modelo_t* modelo){
         //rotar eje y
         x2 = x1 * cosenoy + z1 * senoy;y2 = y1;z2 = -x1 * senoy + z1 * cosenoy;
         // posicion mundo
-        x1 = x2 + posicion.x - camara.posicion.x;
-        y1 = y2 + posicion.y - camara.posicion.y;
-        z1 = z2 + posicion.z - camara.posicion.z;
+        x1 = x2 + posicion->x - camara.posicion.x;
+        y1 = y2 + posicion->y - camara.posicion.y;
+        z1 = z2 + posicion->z - camara.posicion.z;
 
         //rotar camara
-        VerticesTransformados[i].x = x1 * camara.derecha.x + y1 * camara.derecha.y + z1 * camara.derecha.z;
-        VerticesTransformados[i].y = x1 * camara.arriba.x  + y1 * camara.arriba.y  + z1 * camara.arriba.z;
-        VerticesTransformados[i].z = x1 * camara.adelante.x + y1 * camara.adelante.y + z1 * camara.adelante.z;
+        output[i].x = x1*camara.derecha.x  + y1*camara.derecha.y  + z1*camara.derecha.z;
+        output[i].y = x1*camara.arriba.x   + y1*camara.arriba.y   + z1*camara.arriba.z;
+        output[i].z = x1*camara.adelante.x + y1*camara.adelante.y + z1*camara.adelante.z;
     }
+}
+
+
+void transformarVertices(modelo_t* modelo){
+    transformarPuntos(modelo->vertices, VerticesTransformados, modelo->cantidadVertices, &modelo->objeto.posicion, &modelo->objeto.rotacion);
 }
 
 
@@ -85,40 +102,37 @@ void proyectar2D(){
         }
     }
 }
-static Uint32 colorPorPosicion(punto3D_t p1, punto3D_t p2, punto3D_t p3) {
-    // centroide del triángulo en espacio mundo
-    float cx = (p1.x + p2.x + p3.x) / 3.0f;
-    float cy = (p1.y + p2.y + p3.y) / 3.0f;
-    float cz = (p1.z + p2.z + p3.z) / 3.0f;
 
-    // mapear posicion a hue (0.0 - 1.0)
-    // podés ajustar la escala según el tamaño de tu escena
-    float hue = fmodf((cx * 0.3f + cy * 0.5f + cz * 0.7f), 1.0f);
-    if (hue < 0) hue += 1.0f;
-
-    // HSV a RGB (S=0.8, V=0.9 para colores vivos pero no saturados al máximo)
-    float s = 0.8f, v = 0.9f;
-    float h6 = hue * 6.0f;
-    int   hi = (int)h6 % 6;
-    float f  = h6 - (int)h6;
-    float p  = v * (1.0f - s);
-    float q  = v * (1.0f - s * f);
-    float t  = v * (1.0f - s * (1.0f - f));
-
-    float r, g, b;
-    switch (hi) {
-        case 0: r=v; g=t; b=p; break;
-        case 1: r=q; g=v; b=p; break;
-        case 2: r=p; g=v; b=t; break;
-        case 3: r=p; g=q; b=v; break;
-        case 4: r=t; g=p; b=v; break;
-        default:r=v; g=p; b=q; break;
+void transformarLuces(){
+    punto3D_t origen = {0, 0, 0};
+    punto3D_t rotacionCero = {0, 0, 0};
+    for(int i = 0; i < lucesSize; i++){
+        transformarPuntos(&origen, &lucesTransformadas[i], 1,&luces[i].objeto.posicion, &rotacionCero);
     }
+}
 
-    Uint8 R = (Uint8)(r * 255);
-    Uint8 G = (Uint8)(g * 255);
-    Uint8 B = (Uint8)(b * 255);
-    return (R << 16) | (G << 8) | B;
+float calcularIluminacionPoligono(int i){
+    punto3D_t p1 = poligonosClipeados[i].p1;
+    punto3D_t p2 = poligonosClipeados[i].p2;
+    punto3D_t p3 = poligonosClipeados[i].p3;
+
+    punto3D_t lado1 = {p2.x-p1.x, p2.y-p1.y, p2.z-p1.z};
+    punto3D_t lado2 = {p3.x-p1.x, p3.y-p1.y, p3.z-p1.z};
+
+    punto3D_t normal = normalizar((punto3D_t){lado1.y*lado2.z - lado1.z*lado2.y,lado1.z*lado2.x - lado1.x*lado2.z,lado1.x*lado2.y - lado1.y*lado2.x});
+
+    punto3D_t centroPoligono = {(p1.x+p2.x+p3.x)/3.0f,(p1.y+p2.y+p3.y)/3.0f,(p1.z+p2.z+p3.z)/3.0f};
+
+    float intensidad = LUZ_AMBIENTAL;
+    for(int j = 0; j < lucesSize; j++){
+        float dx = lucesTransformadas[j].x - centroPoligono.x;float dy = lucesTransformadas[j].y - centroPoligono.y;float dz = lucesTransformadas[j].z - centroPoligono.z;
+        float distancia = fmax(sqrtf(dx*dx + dy*dy + dz*dz),1e-6f);
+        punto3D_t dirLuz = {dx / distancia,dy / distancia,dz / distancia};
+        float productoEscalar = fmaxf(0.0f,normal.x * dirLuz.x +normal.y * dirLuz.y +normal.z * dirLuz.z);
+        float atenuacion = luces[j].intensidad / (distancia * distancia);
+        intensidad += productoEscalar * atenuacion;
+    }
+    return fminf(intensidad, 1.5f);
 }
 
 void dibujarPoligono(){
@@ -160,6 +174,8 @@ void dibujarPoligono(){
         //para la mejor optimizacion habria que poner este if arriba de todo        
         if (DobleAreaP1P2P3 <= 0) continue; //backfaceculling, esto es igual al componente z de la normal del triangulo, si es negativo el triangulo se aleja de la camara por lo que no se va a notar y se poda
 
+        float intensidadLuz = calcularIluminacionPoligono(i);
+
         for(int y = boundingBoxminY; y<= boundingBoxmaxY ; y ++ ){ // y +=PIXELSIZE
             for(int x = boundingBoxminX; x<= boundingBoxmaxX ; x ++){ // x +=PIXELSIZE
                 
@@ -172,13 +188,17 @@ void dibujarPoligono(){
                 float lambda3 = 1.0f - lambda1 - lambda2;
                 
                 float z = 1.0f/((lambda1*(1.0f/z1)) + (lambda2*(1.0f/z2)) + (lambda3*(1.0f/z3)));
-                Uint32 color = (Uint8)(x * 0.4f) << 8 | (Uint8)(y * 0.4f) << 0 | (Uint8)(z * 0.4f) << 16;
+                
+                Uint8 r = (Uint8)(fminf(155.0f* intensidadLuz, 255.0f));Uint8 g = (Uint8)(fminf(0.0f* intensidadLuz, 255.0f));Uint8 b = (Uint8)(fminf(0.0f * intensidadLuz, 255.0f));
+                Uint32 color = (r << 16) | (g << 8) | b;
 
                 bool positivos = (lambda1 >= -0.0001f) && (lambda2 >= -0.0001f) && (lambda3 >= -0.0001f);
                 if(positivos&&(z<=zbuffer[y * ancho_real_memoria + x])){
                     zbuffer[y * ancho_real_memoria + x] = z;
                     pixels[y * ancho_real_memoria + x] = color;
                 }
+                //wireframe
+                //if((fabsf(lambda1) <= 0.02f || fabsf(lambda2) <= 0.02f || fabsf(lambda3) <= 0.02f)&& positivos&& (z < zbuffer[y * ancho_real_memoria + x] + 0.01f)){ pixels[y * ancho_real_memoria + x] = COLOR_WHITE;}
                 
             }
         }
@@ -193,18 +213,18 @@ punto3D_t interseccionNearPlane(punto3D_t* dentro, punto3D_t* afuera){
 }
 
 bool checkeoFueraPantallaPoligono3D(punto3D_t* p1, punto3D_t* p2, punto3D_t* p3){
-    float z1_margin = p1->z * 3;float z2_margin = p2->z * 3;float z3_margin = p3->z * 3;
+    float z1Margen = p1->z * 3;float z2Margen = p2->z * 3;float z3Margen = p3->z * 3;
 
-    bool p1Arriba = p1->y > z1_margin;  bool p2Arriba = p2->y > z2_margin;  bool p3Arriba = p3->y > z3_margin;
+    bool p1Arriba = p1->y > z1Margen;  bool p2Arriba = p2->y > z2Margen;  bool p3Arriba = p3->y > z3Margen;
     bool estaArriba = p1Arriba && p2Arriba && p3Arriba;
 
-    bool p1Abajo = p1->y < -z1_margin; bool p2Abajo = p2->y < -z2_margin; bool p3Abajo = p3->y < -z3_margin;
+    bool p1Abajo = p1->y < -z1Margen; bool p2Abajo = p2->y < -z2Margen; bool p3Abajo = p3->y < -z3Margen;
     bool estaAbajo = p1Abajo && p2Abajo && p3Abajo;
 
-    bool p1Derecha = p1->x > z1_margin; bool p2Derecha = p2->x > z2_margin; bool p3Derecha = p3->x > z3_margin;
+    bool p1Derecha = p1->x > z1Margen; bool p2Derecha = p2->x > z2Margen; bool p3Derecha = p3->x > z3Margen;
     bool estaDerecha = p1Derecha && p2Derecha && p3Derecha;
 
-    bool p1Izquierda = p1->x < -z1_margin; bool p2Izquierda = p2->x < -z2_margin; bool p3Izquierda = p3->x < -z3_margin; 
+    bool p1Izquierda = p1->x < -z1Margen; bool p2Izquierda = p2->x < -z2Margen; bool p3Izquierda = p3->x < -z3Margen; 
     bool estaIzquierda = p1Izquierda && p2Izquierda && p3Izquierda;
 
     //return false;
@@ -301,11 +321,9 @@ void modelosEncontrarBoundingBox(modelo_t* modelos) {
     }
 }
 
-void renderInit(SDL_Surface* superficie,SDL_Window* ventana){
+void renderInit(SDL_Surface* superficie,SDL_Window* ventana, int cantLuces){
     modelosSize = 0;
-
     parsearModelos(&modelos,&modelosSize);
-
     modelosEncontrarBoundingBox(modelos);
 
     surface = superficie;
@@ -318,49 +336,37 @@ void renderInit(SDL_Surface* superficie,SDL_Window* ventana){
     size_t maxVerticesSize= 0;
     size_t maxPoligonosSize = 0;
     if(modelosSize != 0){
-        modelos[0].posicion = (punto3D_t) {(float) 0.0f,0.0f,0.0f};
+        modelos[0].objeto.posicion = (punto3D_t) {(float) 0.0f,0.0f,0.0f};
 
         maxVerticesSize= modelos[0].cantidadVertices;
         maxPoligonosSize = modelos[0].cantidadPoligonos;
         for (int i = 1; i< modelosSize;i++ ){
             if(modelos[i].cantidadVertices > maxVerticesSize)  maxVerticesSize =modelos[i].cantidadVertices;
             if(modelos[i].cantidadPoligonos > maxPoligonosSize)  maxPoligonosSize =modelos[i].cantidadPoligonos;
-            modelos[i].posicion = (punto3D_t) {(float) (i*1.5),(i*1.5), (i*1.5)};
+            modelos[i].objeto.posicion = (punto3D_t) {(float) (i*1.5),(i*1.5), (i*1.5)};
         }
+
     }
     VerticesTransformados = malloc(sizeof(punto3D_t) * maxVerticesSize);
     poligonosClipeados = malloc(sizeof(poligono3D_t)* maxPoligonosSize *2);
     poligonosADibujar = malloc(sizeof(poligono2D_t)*maxPoligonosSize*2);
     zbuffer = malloc(sizeof(float)*anchoRealMemoria*ALTURA);
     
+    lucesSize = cantLuces; if(lucesSize==0){LUZ_AMBIENTAL = 1.0f;}
+    luces= calloc(sizeof(luz_t),cantLuces);
+    for(int i = 0; i<lucesSize; i++){luces[i].intensidad = POTENCIA_LUZ;luces[i].objeto.posicion = (punto3D_t) {6.0f, 6.0f, 6.0f};}
+    lucesTransformadas = malloc(sizeof(luz_t)*cantLuces);
+    
+    objetos = malloc(sizeof(objeto_t*)*(modelosSize+lucesSize));
+    for(int i = 0; i<modelosSize; i++){objetos[i] = &modelos[i].objeto;}
+    for(int i = 0; i<lucesSize; i++){objetos[modelosSize+i] = &luces[i].objeto;}
+    objetosSize =modelosSize+lucesSize;
+    
 }
 
 bool modeloFueraDelFrustrum(modelo_t* modelo) {
     punto3D_t transformados[BoundingBoxSize];
-    
-    punto3D_t posicion = modelo->posicion;
-    float senox = sin(modelo->rotacion.x); float cosenox = cos(modelo->rotacion.x);
-    float senoy = sin(modelo->rotacion.y); float cosenoy = cos(modelo->rotacion.y);
-    float senoz = sin(modelo->rotacion.z); float cosenoz = cos(modelo->rotacion.z);
-
-    for (int i = 0; i < BoundingBoxSize; i++) {
-        float x1, x2, y1, y2, z1, z2;
-        x1 = (*modelo->boundingBox)[i].x;
-        y1 = (*modelo->boundingBox)[i].y;
-        z1 = (*modelo->boundingBox)[i].z;
-
-        x2 = x1*cosenoz - y1*senoz; y2 = x1*senoz + y1*cosenoz; z2 = z1;
-        x1 = x2; y1 = y2*cosenox - z2*senox; z1 = y2*senox + z2*cosenox;
-        x2 = x1*cosenoy + z1*senoy; y2 = y1; z2 = -x1*senoy + z1*cosenoy;
-
-        x1 = x2 + posicion.x - camara.posicion.x;
-        y1 = y2 + posicion.y - camara.posicion.y;
-        z1 = z2 + posicion.z - camara.posicion.z;
-
-        transformados[i].x = x1*camara.derecha.x  + y1*camara.derecha.y  + z1*camara.derecha.z;
-        transformados[i].y = x1*camara.arriba.x   + y1*camara.arriba.y   + z1*camara.arriba.z;
-        transformados[i].z = x1*camara.adelante.x + y1*camara.adelante.y + z1*camara.adelante.z;
-    }
+    transformarPuntos(*modelo->boundingBox, transformados,BoundingBoxSize, &modelo->objeto.posicion, &modelo->objeto.rotacion);
 
     int fueraIzquierda=0, fueraDerecha=0, fueraArriba=0, fueraAbajo=0, fueraNear=0;
     for (int i = 0; i < BoundingBoxSize; i++) {
@@ -383,11 +389,14 @@ void renderUpdate(){
         for(int i = 0; i< ALTURA*anchoRealMemoria; i++){zbuffer[i]= INFINITY;}
         
         SDL_FillRect(surface, &fondo, COLOR_BLACK);
+        
+        transformarLuces();
+        
         for(int i= 0; i< modelosSize; i++){
-            modelo_t modelo = modelos[i];
-            if(modeloFueraDelFrustrum(&modelo)) continue;
-            transformarVertices(&modelo);
-            clip3D(&modelo);
+            modelo_t* modelo = &modelos[i];
+            if(modeloFueraDelFrustrum(modelo)) continue;
+            transformarVertices(modelo);
+            clip3D(modelo);
             proyectar2D();
             dibujarPoligono();
         }
@@ -396,32 +405,29 @@ void renderUpdate(){
 }
 
 
-static punto3D_t rotar(punto3D_t v, punto3D_t eje, float angulo) {
-    float coseno = cos(angulo), s = sin(angulo);
-    float productoCruz = eje.x*v.x + eje.y*v.y + eje.z*v.z;
+static punto3D_t rotar(const punto3D_t* v, const punto3D_t* eje, float angulo) {
+    float coseno = cos(angulo), seno = sin(angulo);
+    float productoCruz = eje->x*v->x + eje->y*v->y + eje->z*v->z;
     punto3D_t cruz = {
-        eje.y*v.z - eje.z*v.y,
-        eje.z*v.x - eje.x*v.z,
-        eje.x*v.y - eje.y*v.x
+        eje->y*v->z - eje->z*v->y,
+        eje->z*v->x - eje->x*v->z,
+        eje->x*v->y - eje->y*v->x
     };
     return (punto3D_t){
-        v.x*coseno + cruz.x*s + eje.x*productoCruz*(1-coseno),
-        v.y*coseno + cruz.y*s + eje.y*productoCruz*(1-coseno),
-        v.z*coseno + cruz.z*s + eje.z*productoCruz*(1-coseno)
+        v->x*coseno + cruz.x*seno + eje->x*productoCruz*(1-coseno),
+        v->y*coseno + cruz.y*seno + eje->y*productoCruz*(1-coseno),
+        v->z*coseno + cruz.z*seno + eje->z*productoCruz*(1-coseno)
     };
 }
 
-static punto3D_t normalizar(punto3D_t v) {
-    float len = sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
-    return (punto3D_t){v.x/len, v.y/len, v.z/len};
-}
+
 
 void actualizarCamara(float deltaX, float deltaY) {
 
     punto3D_t ejeY = {0, 1, 0};
-    camara.adelante = normalizar(rotar(camara.adelante, ejeY, -deltaX * SENSIBILIDAD));
-    camara.derecha  = normalizar(rotar(camara.derecha,  ejeY, -deltaX * SENSIBILIDAD));
-    camara.adelante = normalizar(rotar(camara.adelante, camara.derecha, deltaY * SENSIBILIDAD));
+    camara.adelante = normalizar(rotar(&camara.adelante, &ejeY, -deltaX * SENSIBILIDAD));
+    camara.derecha  = normalizar(rotar(&camara.derecha,  &ejeY, -deltaX * SENSIBILIDAD));
+    camara.adelante = normalizar(rotar(&camara.adelante, &camara.derecha, deltaY * SENSIBILIDAD));
 
     camara.arriba = (punto3D_t){
         camara.derecha.y * camara.adelante.z - camara.derecha.z * camara.adelante.y,
@@ -459,47 +465,49 @@ void renderInput(const Uint8* teclado){
             camara.posicion.z -= camara.arriba.z * VELOCIDAD;
         }
         if (teclado[SDL_SCANCODE_R]) {
-            modelos[modeloSeleccionado].posicion.x += camara.adelante.x * VELOCIDAD;
-            modelos[modeloSeleccionado].posicion.y += camara.adelante.y * VELOCIDAD; 
-            modelos[modeloSeleccionado].posicion.z += camara.adelante.z * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.x += camara.adelante.x * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.y += camara.adelante.y * VELOCIDAD; 
+            objetos[objetoSeleccionado]->posicion.z += camara.adelante.z * VELOCIDAD;
         }
         if (teclado[SDL_SCANCODE_Y]) {
-            modelos[modeloSeleccionado].posicion.x -= camara.adelante.x * VELOCIDAD;
-            modelos[modeloSeleccionado].posicion.y -= camara.adelante.y * VELOCIDAD;
-            modelos[modeloSeleccionado].posicion.z -= camara.adelante.z * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.x -= camara.adelante.x * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.y -= camara.adelante.y * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.z -= camara.adelante.z * VELOCIDAD;
         }
         if (teclado[SDL_SCANCODE_F]) {
-            modelos[modeloSeleccionado].posicion.x -= camara.derecha.x * VELOCIDAD;
-            modelos[modeloSeleccionado].posicion.z -= camara.derecha.z * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.x -= camara.derecha.x * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.z -= camara.derecha.z * VELOCIDAD;
         }
         if (teclado[SDL_SCANCODE_H]) {
-            modelos[modeloSeleccionado].posicion.x += camara.derecha.x * VELOCIDAD;
-            modelos[modeloSeleccionado].posicion.z += camara.derecha.z * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.x += camara.derecha.x * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.z += camara.derecha.z * VELOCIDAD;
         }
         if (teclado[SDL_SCANCODE_T]) {
-            modelos[modeloSeleccionado].posicion.x += camara.arriba.x * VELOCIDAD;
-            modelos[modeloSeleccionado].posicion.y += camara.arriba.y * VELOCIDAD;
-            modelos[modeloSeleccionado].posicion.z += camara.arriba.z * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.x += camara.arriba.x * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.y += camara.arriba.y * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.z += camara.arriba.z * VELOCIDAD;
         }
         if (teclado[SDL_SCANCODE_G]) {
-            modelos[modeloSeleccionado].posicion.x -= camara.arriba.x * VELOCIDAD;
-            modelos[modeloSeleccionado].posicion.y -= camara.arriba.y * VELOCIDAD;
-            modelos[modeloSeleccionado].posicion.z -= camara.arriba.z * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.x -= camara.arriba.x * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.y -= camara.arriba.y * VELOCIDAD;
+            objetos[objetoSeleccionado]->posicion.z -= camara.arriba.z * VELOCIDAD;
         }
-        if (teclado[SDL_SCANCODE_E]) { modeloSeleccionado = (modeloSeleccionado == 0) ? modelosSize - 1 : modeloSeleccionado - 1;}
-        if (teclado[SDL_SCANCODE_Q]){modeloSeleccionado = (modeloSeleccionado + 1)% modelosSize;}
-        if (teclado[SDL_SCANCODE_I]){modelos[modeloSeleccionado].rotacion.x += PI*DELTATIEMPO;}
-        if (teclado[SDL_SCANCODE_K]){modelos[modeloSeleccionado].rotacion.x -= PI*DELTATIEMPO;} 
-        if (teclado[SDL_SCANCODE_J]){modelos[modeloSeleccionado].rotacion.y += PI*DELTATIEMPO;}
-        if (teclado[SDL_SCANCODE_L]){modelos[modeloSeleccionado].rotacion.y -= PI*DELTATIEMPO;}
-        if (teclado[SDL_SCANCODE_U]){modelos[modeloSeleccionado].rotacion.z += PI*DELTATIEMPO;}
-        if (teclado[SDL_SCANCODE_O]){modelos[modeloSeleccionado].rotacion.z -= PI*DELTATIEMPO;}
+        if (teclado[SDL_SCANCODE_E]){objetoSeleccionado = (objetoSeleccionado == 0) ?objetosSize - 1 :objetoSeleccionado - 1;}
+        if (teclado[SDL_SCANCODE_Q]){objetoSeleccionado = (objetoSeleccionado + 1)% objetosSize;}
+        if (teclado[SDL_SCANCODE_I]){objetos[objetoSeleccionado]->rotacion.x += PI*DELTATIEMPO;}
+        if (teclado[SDL_SCANCODE_K]){objetos[objetoSeleccionado]->rotacion.x -= PI*DELTATIEMPO;} 
+        if (teclado[SDL_SCANCODE_J]){objetos[objetoSeleccionado]->rotacion.y += PI*DELTATIEMPO;}
+        if (teclado[SDL_SCANCODE_L]){objetos[objetoSeleccionado]->rotacion.y -= PI*DELTATIEMPO;}
+        if (teclado[SDL_SCANCODE_U]){objetos[objetoSeleccionado]->rotacion.z += PI*DELTATIEMPO;}
+        if (teclado[SDL_SCANCODE_O]){objetos[objetoSeleccionado]->rotacion.z -= PI*DELTATIEMPO;}
 };
 void renderDestroy(){
     free(VerticesTransformados);
     free(poligonosClipeados);
     free(poligonosADibujar);
     free(zbuffer);
+    free(luces);
+    free(lucesTransformadas);
     for(int i = 0; i<modelosSize; i++){
         free(modelos[i].poligonos);
         free(modelos[i].vertices);
